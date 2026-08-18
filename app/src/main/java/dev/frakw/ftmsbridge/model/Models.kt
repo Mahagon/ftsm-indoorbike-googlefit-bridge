@@ -30,4 +30,6 @@ data class BridgeState(
     val error: String? = null,
     val rawPacket: String? = null,
     val diagnostics: List<String> = emptyList(),
+    val monitoringEnabled: Boolean = false,
+    val reconnectDeadline: Instant? = null,
 )

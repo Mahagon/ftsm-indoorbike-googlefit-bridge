@@ -86,6 +86,8 @@ class WorkoutRecorderTest {
 
         override suspend fun activeWorkout() = workouts.values.lastOrNull { it.state == WorkoutEntity.STATE_ACTIVE }
 
+        override suspend fun latestSampleTimestamp(workoutId: String) = samples.values.filter { it.workoutId == workoutId }.maxOfOrNull { it.timestampMillis }
+
         override suspend fun workout(id: String) = workouts[id]?.let { workout ->
             WorkoutWithSamples(workout, samples.values.filter { it.workoutId == id })
         }

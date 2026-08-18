@@ -17,6 +17,9 @@ interface WorkoutDao {
     @Query("SELECT * FROM workouts WHERE state = 'ACTIVE' ORDER BY startedAtMillis DESC LIMIT 1")
     suspend fun activeWorkout(): WorkoutEntity?
 
+    @Query("SELECT MAX(timestampMillis) FROM samples WHERE workoutId = :workoutId")
+    suspend fun latestSampleTimestamp(workoutId: String): Long?
+
     @Transaction
     @Query("SELECT * FROM workouts WHERE id = :id")
     suspend fun workout(id: String): WorkoutWithSamples?

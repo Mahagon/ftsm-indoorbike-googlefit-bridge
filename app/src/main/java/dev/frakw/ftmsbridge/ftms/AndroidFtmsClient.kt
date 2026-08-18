@@ -34,6 +34,8 @@ class AndroidFtmsClient(
     private val mutableState = MutableStateFlow(FtmsClientState())
     override val state: StateFlow<FtmsClientState> = mutableState.asStateFlow()
     private var gatt: BluetoothGatt? = null
+    private var autoConnect = false
+    private val sampleAccumulator = FtmsSampleAccumulator()
 
     private val scanCallback =
         object : ScanCallback() {
@@ -72,8 +74,12 @@ class AndroidFtmsClient(
                     }
 
                     newState == BluetoothProfile.STATE_DISCONNECTED -> {
-                        mutableState.value = mutableState.value.copy(connection = ConnectionState.DISCONNECTED)
-                        gatt.close()
+                        sampleAccumulator.reset()
+                        mutableState.value = mutableState.value.copy(connection = ConnectionState.DISCONNECTED, latest = null)
+                        if (!autoConnect) {
+                            gatt.close()
+                            if (this@AndroidFtmsClient.gatt === gatt) this@AndroidFtmsClient.gatt = null
+                        }
                     }
                 }
             }
@@ -121,9 +127,10 @@ class AndroidFtmsClient(
                 val raw = value.toHex()
                 when (val result = parser.parse(value, Instant.now())) {
                     is FtmsPacketParser.Result.Success -> {
+                        val merged = sampleAccumulator.merge(result.sample)
                         mutableState.value =
                             mutableState.value.copy(
-                                latest = result.sample,
+                                latest = merged,
                                 rawPacket = raw,
                                 error = null,
                             )
@@ -157,7 +164,10 @@ class AndroidFtmsClient(
         }
     }
 
-    override fun connect(address: String) {
+    override fun connect(
+        address: String,
+        autoConnect: Boolean,
+    ) {
         stopScan()
         val device = adapter?.getRemoteDevice(address) ?: return fail("Bike address is invalid")
         val selected =
@@ -167,10 +177,13 @@ class AndroidFtmsClient(
             mutableState.value.copy(
                 connection = ConnectionState.CONNECTING,
                 selected = selected,
+                latest = null,
                 error = null,
             )
+        sampleAccumulator.reset()
+        this.autoConnect = autoConnect
         gatt?.close()
-        gatt = device.connectGatt(appContext, false, callback, BluetoothDevice.TRANSPORT_LE)
+        gatt = device.connectGatt(appContext, autoConnect, callback, BluetoothDevice.TRANSPORT_LE)
     }
 
     override fun disconnect() {
@@ -178,7 +191,9 @@ class AndroidFtmsClient(
         gatt?.disconnect()
         gatt?.close()
         gatt = null
-        mutableState.value = mutableState.value.copy(connection = ConnectionState.DISCONNECTED)
+        autoConnect = false
+        sampleAccumulator.reset()
+        mutableState.value = mutableState.value.copy(connection = ConnectionState.DISCONNECTED, latest = null)
     }
 
     private fun addDiagnostic(message: String) {

@@ -23,6 +23,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.lightColorScheme
@@ -33,6 +34,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -48,6 +50,7 @@ import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     private val app get() = application as BridgeApplication
+    private var enableMonitoringAfterPermission = false
     private val bluetoothPermissions = arrayOf(
         Manifest.permission.BLUETOOTH_SCAN,
         Manifest.permission.BLUETOOTH_CONNECT,
@@ -60,8 +63,13 @@ class MainActivity : ComponentActivity() {
         if (result[Manifest.permission.BLUETOOTH_SCAN] == true &&
             result[Manifest.permission.BLUETOOTH_CONNECT] == true
         ) {
-            app.controller.reconnectLastBike()
+            if (enableMonitoringAfterPermission) {
+                app.controller.setMonitoringEnabled(true)
+            } else {
+                app.controller.reconnectLastBike()
+            }
         }
+        enableMonitoringAfterPermission = false
     }
 
     private val healthLauncher = registerForActivityResult(
@@ -89,6 +97,7 @@ class MainActivity : ComponentActivity() {
                         }
                     },
                     onStop = app.controller::stopWorkout,
+                    onMonitoringChanged = ::setMonitoringEnabled,
                     onHealthPermissions = { healthLauncher.launch(app.healthWriter.permissions) },
                     onShareDiagnostics = { shareDiagnostics(state) },
                 )
@@ -104,6 +113,15 @@ class MainActivity : ComponentActivity() {
         if (hasBluetoothPermissions()) {
             app.controller.reconnectLastBike()
         } else {
+            bluetoothLauncher.launch(bluetoothPermissions)
+        }
+    }
+
+    private fun setMonitoringEnabled(enabled: Boolean) {
+        if (!enabled || hasBluetoothPermissions()) {
+            app.controller.setMonitoringEnabled(enabled)
+        } else {
+            enableMonitoringAfterPermission = true
             bluetoothLauncher.launch(bluetoothPermissions)
         }
     }
@@ -137,6 +155,7 @@ private fun BridgeScreen(
     onConnect: (String) -> Unit,
     onStart: () -> Unit,
     onStop: () -> Unit,
+    onMonitoringChanged: (Boolean) -> Unit,
     onHealthPermissions: () -> Unit,
     onShareDiagnostics: () -> Unit,
 ) {
@@ -156,6 +175,19 @@ private fun BridgeScreen(
             item {
                 Text("FTMS Bike Bridge", style = MaterialTheme.typography.headlineMedium)
                 Text(stateLabel(state), color = MaterialTheme.colorScheme.primary)
+            }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Background monitoring", style = MaterialTheme.typography.titleMedium)
+                        Text("Reconnect and record automatically", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(checked = state.monitoringEnabled, onCheckedChange = onMonitoringChanged)
+                }
             }
             state.error?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error) } }
             if (state.connection == ConnectionState.DISCONNECTED || state.connection == ConnectionState.ERROR) {
@@ -190,13 +222,15 @@ private fun BridgeScreen(
                     )
                 }
                 item {
-                    if (state.recordingId == null) {
+                    if (state.monitoringEnabled && state.recordingId == null) {
+                        Text("Recording starts automatically when bike data arrives")
+                    } else if (state.recordingId == null) {
                         Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
                             Text("Start workout")
                         }
                     } else {
                         Button(onClick = onStop, modifier = Modifier.fillMaxWidth()) {
-                            Text("Stop and save")
+                            Text(if (state.monitoringEnabled) "Finish now" else "Stop and save")
                         }
                     }
                 }
@@ -243,11 +277,18 @@ private fun Metric(label: String, value: String) {
 }
 
 private fun stateLabel(state: BridgeState): String = when (state.connection) {
-    ConnectionState.DISCONNECTED -> "Not connected"
+    ConnectionState.DISCONNECTED ->
+        if (state.reconnectDeadline != null) "Bike disconnected · waiting up to 5 minutes" else "Not connected"
+
     ConnectionState.SCANNING -> "Scanning…"
+
     ConnectionState.CONNECTING -> "Connecting…"
+
     ConnectionState.READY -> "Ready · ${state.bike?.name.orEmpty()}"
+
     ConnectionState.RECORDING -> "Recording · ${state.bike?.name.orEmpty()}"
+
     ConnectionState.FINALIZING -> "Saving workout…"
+
     ConnectionState.ERROR -> "Connection problem"
 }

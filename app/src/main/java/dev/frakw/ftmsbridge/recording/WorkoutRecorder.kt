@@ -85,4 +85,8 @@ class WorkoutRecorder(
     fun activeId(): String? = active?.id
 
     fun distanceMeters(): Double = calculatedDistance
+
+    suspend fun lastSampleTime(): Instant? = active?.id?.let { id ->
+        dao.latestSampleTimestamp(id)?.let(Instant::ofEpochMilli)
+    }
 }

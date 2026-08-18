@@ -22,7 +22,10 @@ interface FtmsClient {
 
     fun stopScan()
 
-    fun connect(address: String)
+    fun connect(
+        address: String,
+        autoConnect: Boolean = false,
+    )
 
     fun disconnect()
 }
