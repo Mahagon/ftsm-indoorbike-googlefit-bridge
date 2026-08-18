@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "dev.frakw.ftmsbridge"
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "dev.frakw.ftmsbridge"
         minSdk = 34
-        targetSdk = 37
+        targetSdk = 36
         versionCode =
             providers
                 .environmentVariable("VERSION_CODE")

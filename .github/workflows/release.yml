@@ -21,7 +21,7 @@ jobs:
           java-version: "17"
       - uses: android-actions/setup-android@v4
       - name: Install Android SDK
-        run: sdkmanager "platforms;android-37" "build-tools;36.0.0"
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
       - uses: gradle/actions/setup-gradle@v6
       - name: Derive Android version from tag
         shell: bash
