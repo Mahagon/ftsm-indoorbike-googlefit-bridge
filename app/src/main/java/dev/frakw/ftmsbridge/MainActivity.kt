@@ -55,6 +55,7 @@ import dev.frakw.ftmsbridge.history.HistoryViewModel
 import dev.frakw.ftmsbridge.history.WorkoutDetailRoute
 import dev.frakw.ftmsbridge.model.BridgeState
 import dev.frakw.ftmsbridge.model.ConnectionState
+import dev.frakw.ftmsbridge.model.WorkoutTarget
 import dev.frakw.ftmsbridge.update.UpdateStatus
 import dev.frakw.ftmsbridge.update.UpdateUiState
 import dev.frakw.ftmsbridge.update.UpdateViewModel
@@ -175,6 +176,7 @@ class MainActivity : ComponentActivity() {
                         },
                         onStop = app.controller::stopWorkout,
                         onMonitoringChanged = ::setMonitoringEnabled,
+                        onTargetChanged = app.controller::setNextWorkoutTarget,
                         onHealthPermissions = { healthLauncher.launch(app.healthWriter.permissions) },
                         onHistory = { destination = DESTINATION_HISTORY },
                         updateState = updateState,
@@ -277,6 +279,7 @@ private fun BridgeScreen(
     onStart: () -> Unit,
     onStop: () -> Unit,
     onMonitoringChanged: (Boolean) -> Unit,
+    onTargetChanged: (WorkoutTarget?) -> Unit,
     onHealthPermissions: () -> Unit,
     onHistory: () -> Unit,
     updateState: UpdateUiState,
@@ -330,6 +333,9 @@ private fun BridgeScreen(
                     Switch(checked = state.monitoringEnabled, onCheckedChange = onMonitoringChanged)
                 }
             }
+            if (state.recordingId == null) {
+                item { TargetEditor(state.target, onTargetChanged) }
+            }
             state.error?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error) } }
             if (state.connection == ConnectionState.DISCONNECTED || state.connection == ConnectionState.ERROR) {
                 item {
@@ -360,6 +366,7 @@ private fun BridgeScreen(
                         cadence = state.latest?.cadenceRpm,
                         power = state.latest?.powerWatts,
                         distance = state.distanceMeters,
+                        target = state.target,
                     )
                 }
                 item {
@@ -454,13 +461,30 @@ private fun UpdateCard(
 }
 
 @Composable
-private fun Metrics(duration: Long, speed: Double?, cadence: Double?, power: Int?, distance: Double) {
+private fun Metrics(
+    duration: Long,
+    speed: Double?,
+    cadence: Double?,
+    power: Int?,
+    distance: Double,
+    target: WorkoutTarget?,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Metric("Duration", "%02d:%02d:%02d".format(duration / 3600, duration / 60 % 60, duration % 60))
+        val durationValue = "%02d:%02d:%02d".format(duration / 3600, duration / 60 % 60, duration % 60)
+        if (target is WorkoutTarget.Duration) {
+            ProgressMetric("Duration", durationValue, formatTarget(target), targetProgress(target, duration, distance) ?: 0f)
+        } else {
+            Metric("Duration", durationValue)
+        }
         Metric("Speed", speed?.let { String.format(Locale.US, "%.1f km/h", it) } ?: "—")
         Metric("Cadence", cadence?.let { String.format(Locale.US, "%.0f rpm", it) } ?: "—")
         Metric("Power", power?.let { "$it W" } ?: "—")
-        Metric("Distance", String.format(Locale.US, "%.2f km", distance / 1000.0))
+        val distanceValue = String.format(Locale.US, "%.2f km", distance / 1000.0)
+        if (target is WorkoutTarget.Distance) {
+            ProgressMetric("Distance", distanceValue, formatTarget(target), targetProgress(target, duration, distance) ?: 0f)
+        } else {
+            Metric("Distance", distanceValue)
+        }
     }
 }
 

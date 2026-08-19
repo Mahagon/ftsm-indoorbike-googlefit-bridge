@@ -1,10 +1,12 @@
 package dev.frakw.ftmsbridge
 
 import android.content.Context
+import dev.frakw.ftmsbridge.data.target
 import dev.frakw.ftmsbridge.ftms.FtmsClient
 import dev.frakw.ftmsbridge.model.BridgeState
 import dev.frakw.ftmsbridge.model.ConnectionState
 import dev.frakw.ftmsbridge.model.IndoorBikeSample
+import dev.frakw.ftmsbridge.model.WorkoutTarget
 import dev.frakw.ftmsbridge.recording.WorkoutRecorder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -32,7 +34,12 @@ class BridgeController internal constructor(
     private val disconnectGraceMillis: Long = DISCONNECT_GRACE_MILLIS,
     private val retryMillis: Long = RETRY_MILLIS,
 ) {
-    private val mutableState = MutableStateFlow(BridgeState(monitoringEnabled = environment.isMonitoringEnabled()))
+    private val mutableState = MutableStateFlow(
+        BridgeState(
+            monitoringEnabled = environment.isMonitoringEnabled(),
+            target = environment.pendingTarget(),
+        ),
+    )
     val state: StateFlow<BridgeState> = mutableState.asStateFlow()
     private val workoutMutex = Mutex()
     private var lastSampleMillis = 0L
@@ -58,6 +65,7 @@ class BridgeController internal constructor(
                         recordingId = workout.id,
                         startedAt = Instant.ofEpochMilli(workout.startedAtMillis),
                         distanceMeters = workout.distanceMeters,
+                        target = workout.target(),
                     )
                 }
             }
@@ -160,6 +168,12 @@ class BridgeController internal constructor(
         }
     }
 
+    fun setNextWorkoutTarget(target: WorkoutTarget?) {
+        if (recorder.activeId() != null) return
+        environment.setPendingTarget(target)
+        mutableState.update { it.copy(target = target) }
+    }
+
     fun retryHealthSync() = enqueueHealthSync()
 
     private suspend fun handleSample(sample: IndoorBikeSample) {
@@ -183,7 +197,9 @@ class BridgeController internal constructor(
     }
 
     private suspend fun startWorkoutLocked(at: Instant = clock.instant()) {
-        val workout = recorder.start(at)
+        val target = environment.pendingTarget()
+        val workout = recorder.start(at, target)
+        environment.setPendingTarget(null)
         mutableState.update {
             it.copy(
                 connection = ConnectionState.RECORDING,
@@ -191,6 +207,7 @@ class BridgeController internal constructor(
                 startedAt = Instant.ofEpochMilli(workout.startedAtMillis),
                 distanceMeters = 0.0,
                 error = null,
+                target = target,
             )
         }
     }
@@ -230,6 +247,7 @@ class BridgeController internal constructor(
                 connection = displayConnection(client.state.value.connection, false),
                 recordingId = null,
                 startedAt = null,
+                target = null,
             )
         }
         if (completed != null) environment.enqueueHealthSync()

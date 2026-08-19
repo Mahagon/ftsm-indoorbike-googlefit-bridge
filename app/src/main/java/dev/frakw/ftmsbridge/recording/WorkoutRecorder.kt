@@ -4,6 +4,7 @@ import dev.frakw.ftmsbridge.data.SampleEntity
 import dev.frakw.ftmsbridge.data.WorkoutDao
 import dev.frakw.ftmsbridge.data.WorkoutEntity
 import dev.frakw.ftmsbridge.model.IndoorBikeSample
+import dev.frakw.ftmsbridge.model.WorkoutTarget
 import java.time.Instant
 import java.util.UUID
 import kotlin.math.max
@@ -22,8 +23,16 @@ class WorkoutRecorder(
         calculatedDistance = it.distanceMeters
     }
 
-    suspend fun start(at: Instant = Instant.now()): WorkoutEntity {
-        val workout = WorkoutEntity(id = UUID.randomUUID().toString(), startedAtMillis = at.toEpochMilli())
+    suspend fun start(
+        at: Instant = Instant.now(),
+        target: WorkoutTarget? = null,
+    ): WorkoutEntity {
+        val workout = WorkoutEntity(
+            id = UUID.randomUUID().toString(),
+            startedAtMillis = at.toEpochMilli(),
+            targetDurationSeconds = (target as? WorkoutTarget.Duration)?.seconds,
+            targetDistanceMeters = (target as? WorkoutTarget.Distance)?.meters,
+        )
         dao.upsertWorkout(workout)
         active = workout
         lastStoredSecond = null

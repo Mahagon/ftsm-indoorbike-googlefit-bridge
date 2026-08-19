@@ -22,6 +22,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.frakw.ftmsbridge.data.WorkoutEntity
+import dev.frakw.ftmsbridge.data.target
+import dev.frakw.ftmsbridge.formatTarget
+import dev.frakw.ftmsbridge.targetReached
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
@@ -111,6 +114,10 @@ private fun WorkoutDetailScreen(
                             DetailRow("Ended", workout.endedAtMillis?.let(::formatDateTime) ?: "—")
                             DetailRow("Duration", formatDuration(workout))
                             DetailRow("Distance", formatDistance(workout.distanceMeters))
+                            workout.target()?.let { target ->
+                                DetailRow("Target", formatTarget(target))
+                                DetailRow("Target result", if (targetReached(workout) == true) "Reached" else "Not reached")
+                            }
                         }
                     }
                 }

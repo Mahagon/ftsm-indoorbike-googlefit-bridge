@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import dev.frakw.ftmsbridge.model.WorkoutTarget
 
 @Entity(tableName = "workouts")
 data class WorkoutEntity(
@@ -14,11 +15,19 @@ data class WorkoutEntity(
     val state: String = STATE_ACTIVE,
     val synced: Boolean = false,
     val syncError: String? = null,
+    val targetDurationSeconds: Long? = null,
+    val targetDistanceMeters: Double? = null,
 ) {
     companion object {
         const val STATE_ACTIVE = "ACTIVE"
         const val STATE_COMPLETE = "COMPLETE"
     }
+}
+
+fun WorkoutEntity.target(): WorkoutTarget? = when {
+    targetDurationSeconds != null -> WorkoutTarget.Duration(targetDurationSeconds)
+    targetDistanceMeters != null -> WorkoutTarget.Distance(targetDistanceMeters)
+    else -> null
 }
 
 @Entity(

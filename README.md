@@ -6,6 +6,7 @@ FTMS Bike Bridge is an Android app that records workouts from an FTMS-compatible
 
 - Records duration, distance, speed, cycling cadence, and power.
 - Keeps a local, paginated workout history with summary statistics and Health Connect sync status.
+- Supports one-session duration or distance targets with live progress.
 - Supports manual recording or automatic background monitoring and recording.
 - Restores background monitoring after a phone restart.
 - Continues recording with the screen off and tolerates a bike disconnect for up to five minutes.
@@ -43,6 +44,14 @@ The selected bike is remembered for future reconnections.
 
 ## Record workouts
 
+### Set a session target
+
+Before a workout starts, use **Session target** to select either **Duration** or **Distance**. Enter positive whole minutes or a kilometer value such as `12.5`, then tap **Set target**.
+
+The target applies to the next workout only, including a workout started automatically by background monitoring. Once that workout starts, the pending target is cleared. Use **Clear** before starting if you no longer want it.
+
+During the workout, the targeted duration or distance card fills from left to right while continuing to show the current value. At 100% it displays **Target reached** and remains full; recording continues until you finish the workout.
+
 ### Manual recording
 
 1. Connect the bike and wait for **Ready**.
@@ -68,6 +77,8 @@ Each entry shows its date, duration, distance, and Health Connect state:
 - **Failed:** export failed; open the workout to see the error and tap **Retry sync**.
 
 Workout details include average and maximum speed, cadence, and power when the bike supplied those measurements.
+
+If the workout had a target, its details also show the planned value and whether it was reached.
 
 Workouts recorded by affected older releases may show that detailed metrics are unavailable. Those releases deleted their local sample rows while updating the workout, so the missing historical samples cannot be reconstructed. Workouts recorded after the fix retain their samples.
 
