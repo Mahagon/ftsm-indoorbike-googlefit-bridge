@@ -114,9 +114,20 @@ private fun WorkoutDetailScreen(
                         }
                     }
                 }
-                item { MetricCard("Speed", details.speedKph, "km/h") }
-                item { MetricCard("Cadence", details.cadenceRpm, "rpm") }
-                item { MetricCard("Power", details.powerWatts, "W") }
+                if (details.hasSamples) {
+                    item { MetricCard("Speed", details.speedKph, "km/h") }
+                    item { MetricCard("Cadence", details.cadenceRpm, "rpm") }
+                    item { MetricCard("Power", details.powerWatts, "W") }
+                } else {
+                    item {
+                        Card(Modifier.fillMaxWidth()) {
+                            Text(
+                                "Detailed metrics are unavailable for this workout.",
+                                modifier = Modifier.padding(16.dp),
+                            )
+                        }
+                    }
+                }
                 item {
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

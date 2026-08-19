@@ -29,6 +29,7 @@ data class MetricSummary(
 
 data class WorkoutDetails(
     val workout: WorkoutEntity,
+    val hasSamples: Boolean,
     val speedKph: MetricSummary?,
     val cadenceRpm: MetricSummary?,
     val powerWatts: MetricSummary?,
@@ -36,6 +37,7 @@ data class WorkoutDetails(
 
 internal fun WorkoutWithSamples.toDetails(): WorkoutDetails = WorkoutDetails(
     workout = workout,
+    hasSamples = samples.isNotEmpty(),
     speedKph = samples.mapNotNull { it.speedKph }.summary(),
     cadenceRpm = samples.mapNotNull { it.cadenceRpm }.summary(),
     powerWatts = samples.mapNotNull { it.powerWatts?.toDouble() }.summary(),

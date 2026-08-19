@@ -33,6 +33,7 @@ class HistoryTest {
         assertEquals(30.0, value.speedKph?.maximum ?: 0.0, 0.001)
         assertEquals(80.0, value.cadenceRpm?.average ?: 0.0, 0.001)
         assertEquals(150.0, value.powerWatts?.average ?: 0.0, 0.001)
+        assertTrue(value.hasSamples)
     }
 
     @Test
@@ -41,6 +42,7 @@ class HistoryTest {
         assertNull(value.speedKph)
         assertNull(value.cadenceRpm)
         assertNull(value.powerWatts)
+        assertFalse(value.hasSamples)
     }
 
     @Test

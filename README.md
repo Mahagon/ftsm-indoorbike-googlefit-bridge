@@ -30,6 +30,14 @@ The package name is `dev.frakw.ftmsbridge`. This repository is GPLv3 licensed.
 
 Health Connect remains the source of truth. Google Fit may display the session and distance without rendering every cadence or power sample in its own interface.
 
+Completed workouts are also available under **History** in the app. Open a workout to see its duration, distance, synchronization state, and average and maximum speed, cadence, and power when those metrics were recorded.
+
+## App updates
+
+Signed release builds check GitHub Releases for a newer stable version at most once per day. You can also use **Check updates** on the main screen. The app downloads the matching APK and checksum only after you choose **Update**, verifies them, and then opens Android's installer. Android may first ask you to allow FTMS Bike Bridge as an installation source and always asks you to confirm the update.
+
+Debug builds do not check for or install release updates.
+
 ## Diagnostics
 
 Open **Diagnostics** in the app to inspect the last raw FTMS packet and the discovered GATT characteristics. Use **Share diagnostic log** when a JC-series firmware exposes different fields or fails to connect.

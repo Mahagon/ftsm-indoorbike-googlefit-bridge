@@ -3,7 +3,9 @@ package dev.frakw.ftmsbridge
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -42,7 +44,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.health.connect.client.PermissionController
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.frakw.ftmsbridge.history.HistoryRoute
@@ -50,6 +55,9 @@ import dev.frakw.ftmsbridge.history.HistoryViewModel
 import dev.frakw.ftmsbridge.history.WorkoutDetailRoute
 import dev.frakw.ftmsbridge.model.BridgeState
 import dev.frakw.ftmsbridge.model.ConnectionState
+import dev.frakw.ftmsbridge.update.UpdateStatus
+import dev.frakw.ftmsbridge.update.UpdateUiState
+import dev.frakw.ftmsbridge.update.UpdateViewModel
 import kotlinx.coroutines.delay
 import java.time.Duration
 import java.time.Instant
@@ -58,6 +66,7 @@ import java.util.Locale
 class MainActivity : ComponentActivity() {
     private val app get() = application as BridgeApplication
     private var enableMonitoringAfterPermission = false
+    private var updateViewModel: UpdateViewModel? = null
     private val bluetoothPermissions = arrayOf(
         Manifest.permission.BLUETOOTH_SCAN,
         Manifest.permission.BLUETOOTH_CONNECT,
@@ -85,15 +94,25 @@ class MainActivity : ComponentActivity() {
         if (granted.containsAll(app.healthWriter.permissions)) app.controller.retryHealthSync()
     }
 
+    private val installSourceLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) {
+        if (packageManager.canRequestPackageInstalls()) launchUpdateInstaller()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             FtmsBridgeTheme {
                 val state by app.controller.state.collectAsStateWithLifecycle()
                 val historyViewModel = viewModel { HistoryViewModel(app.database.workouts()) }
+                val updater = viewModel { UpdateViewModel(application) }
+                updateViewModel = updater
+                val updateState by updater.state.collectAsStateWithLifecycle()
                 var destination by rememberSaveable { mutableStateOf(DESTINATION_MAIN) }
                 var selectedWorkout by rememberSaveable { mutableStateOf<String?>(null) }
                 val keepScreenAwake = shouldKeepScreenAwake(state.connection)
+                LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { updater.automaticCheck() }
                 DisposableEffect(keepScreenAwake) {
                     if (keepScreenAwake) {
                         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -158,6 +177,13 @@ class MainActivity : ComponentActivity() {
                         onMonitoringChanged = ::setMonitoringEnabled,
                         onHealthPermissions = { healthLauncher.launch(app.healthWriter.permissions) },
                         onHistory = { destination = DESTINATION_HISTORY },
+                        updateState = updateState,
+                        updatesEnabled = !BuildConfig.DEBUG,
+                        updateInstallAllowed = state.recordingId == null && state.connection != ConnectionState.FINALIZING,
+                        onCheckUpdates = updater::manualCheck,
+                        onStartUpdate = updater::startDownload,
+                        onDismissUpdate = updater::dismiss,
+                        onInstallUpdate = ::requestUpdateInstall,
                         onShareDiagnostics = { shareDiagnostics(state) },
                     )
                 }
@@ -184,6 +210,33 @@ class MainActivity : ComponentActivity() {
             enableMonitoringAfterPermission = true
             bluetoothLauncher.launch(bluetoothPermissions)
         }
+    }
+
+    private fun requestUpdateInstall() {
+        val updater = updateViewModel ?: return
+        val state = app.controller.state.value
+        if (state.recordingId != null || state.connection == ConnectionState.FINALIZING) return
+        if (updater.readyFile() == null) return
+        if (!packageManager.canRequestPackageInstalls()) {
+            installSourceLauncher.launch(
+                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")),
+            )
+            return
+        }
+        launchUpdateInstaller()
+    }
+
+    private fun launchUpdateInstaller() {
+        val state = app.controller.state.value
+        if (state.recordingId != null || state.connection == ConnectionState.FINALIZING) return
+        val file = updateViewModel?.readyFile() ?: return
+        val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+        startActivity(
+            Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, UpdateViewModel.APK_MIME)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+        )
     }
 
     private fun shareDiagnostics(state: BridgeState) {
@@ -226,6 +279,13 @@ private fun BridgeScreen(
     onMonitoringChanged: (Boolean) -> Unit,
     onHealthPermissions: () -> Unit,
     onHistory: () -> Unit,
+    updateState: UpdateUiState,
+    updatesEnabled: Boolean,
+    updateInstallAllowed: Boolean,
+    onCheckUpdates: () -> Unit,
+    onStartUpdate: () -> Unit,
+    onDismissUpdate: () -> Unit,
+    onInstallUpdate: () -> Unit,
     onShareDiagnostics: () -> Unit,
 ) {
     var diagnostics by remember { mutableStateOf(false) }
@@ -244,6 +304,18 @@ private fun BridgeScreen(
             item {
                 Text("FTMS Bike Bridge", style = MaterialTheme.typography.headlineMedium)
                 Text(stateLabel(state), color = MaterialTheme.colorScheme.primary)
+            }
+            if (updatesEnabled && updateState.status != UpdateStatus.IDLE) {
+                item {
+                    UpdateCard(
+                        state = updateState,
+                        installAllowed = updateInstallAllowed,
+                        onDownload = onStartUpdate,
+                        onLater = onDismissUpdate,
+                        onRetry = onCheckUpdates,
+                        onInstall = onInstallUpdate,
+                    )
+                }
             }
             item {
                 Row(
@@ -305,10 +377,17 @@ private fun BridgeScreen(
                 }
             }
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = onHistory) { Text("History") }
-                    TextButton(onClick = onHealthPermissions) { Text("Health permissions") }
-                    TextButton(onClick = { diagnostics = !diagnostics }) { Text("Diagnostics") }
+                Column {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = onHistory) { Text("History") }
+                        TextButton(onClick = onHealthPermissions) { Text("Health permissions") }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (updatesEnabled) {
+                            TextButton(onClick = onCheckUpdates) { Text("Check updates") }
+                        }
+                        TextButton(onClick = { diagnostics = !diagnostics }) { Text("Diagnostics") }
+                    }
                 }
             }
             if (diagnostics) {
@@ -320,6 +399,55 @@ private fun BridgeScreen(
                     OutlinedButton(onClick = onShareDiagnostics) { Text("Share diagnostic log") }
                 }
                 items(state.diagnostics) { line -> Text(line, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpdateCard(
+    state: UpdateUiState,
+    installAllowed: Boolean,
+    onDownload: () -> Unit,
+    onLater: () -> Unit,
+    onRetry: () -> Unit,
+    onInstall: () -> Unit,
+) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("App update", style = MaterialTheme.typography.titleMedium)
+            state.release?.let { release ->
+                Text("${release.title} is available")
+                if (release.notes.isNotBlank()) {
+                    Text(release.notes, style = MaterialTheme.typography.bodySmall, maxLines = 4)
+                }
+            }
+            state.message?.let {
+                Text(it, color = if (state.status == UpdateStatus.ERROR) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
+            }
+            when (state.status) {
+                UpdateStatus.CHECKING -> Text("Checking for updates…")
+
+                UpdateStatus.DOWNLOADING -> Text("Downloading… ${state.progress?.let { "$it%" } ?: ""}")
+
+                UpdateStatus.AVAILABLE -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = onDownload) { Text("Update") }
+                    TextButton(onClick = onLater) { Text("Later") }
+                }
+
+                UpdateStatus.READY -> {
+                    Button(onClick = onInstall, enabled = installAllowed) { Text("Install") }
+                    if (!installAllowed) Text("Finish the active workout before installing.")
+                }
+
+                UpdateStatus.UP_TO_DATE -> TextButton(onClick = onLater) { Text("Dismiss") }
+
+                UpdateStatus.ERROR -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = if (state.release == null) onRetry else onDownload) { Text("Retry") }
+                    TextButton(onClick = onLater) { Text("Dismiss") }
+                }
+
+                UpdateStatus.IDLE -> Unit
             }
         }
     }
