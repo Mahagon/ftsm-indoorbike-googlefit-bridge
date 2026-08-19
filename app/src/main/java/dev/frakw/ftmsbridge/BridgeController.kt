@@ -1,15 +1,10 @@
 package dev.frakw.ftmsbridge
 
 import android.content.Context
-import androidx.core.content.edit
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
 import dev.frakw.ftmsbridge.ftms.FtmsClient
-import dev.frakw.ftmsbridge.health.HealthSyncWorker
 import dev.frakw.ftmsbridge.model.BridgeState
 import dev.frakw.ftmsbridge.model.ConnectionState
 import dev.frakw.ftmsbridge.model.IndoorBikeSample
-import dev.frakw.ftmsbridge.recording.RecordingService
 import dev.frakw.ftmsbridge.recording.WorkoutRecorder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -20,64 +15,75 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.getAndUpdate
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.time.Clock
 import java.time.Instant
 
-class BridgeController(
-    private val context: Context,
+class BridgeController internal constructor(
     private val client: FtmsClient,
     private val recorder: WorkoutRecorder,
+    private val environment: BridgeEnvironment,
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    private val clock: Clock = Clock.systemUTC(),
+    private val disconnectGraceMillis: Long = DISCONNECT_GRACE_MILLIS,
+    private val retryMillis: Long = RETRY_MILLIS,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val mutableState = MutableStateFlow(BridgeState())
+    private val mutableState = MutableStateFlow(BridgeState(monitoringEnabled = environment.isMonitoringEnabled()))
     val state: StateFlow<BridgeState> = mutableState.asStateFlow()
     private val workoutMutex = Mutex()
-    private val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
     private var lastSampleMillis = 0L
     private var lastMeasurementAt: Instant? = null
     private var disconnectJob: Job? = null
     private var retryJob: Job? = null
     private var autoStartSuppressed = false
 
+    constructor(
+        context: Context,
+        client: FtmsClient,
+        recorder: WorkoutRecorder,
+    ) : this(client, recorder, AndroidBridgeEnvironment(context))
+
     init {
         scope.launch {
-            val monitoring = isMonitoringEnabled(context)
             val restored = recorder.restore()
             restored?.let { workout ->
                 lastMeasurementAt = recorder.lastSampleTime()
                 lastSampleMillis = lastMeasurementAt?.toEpochMilli() ?: 0L
-                mutableState.value =
-                    mutableState.value.copy(
+                mutableState.update {
+                    it.copy(
                         recordingId = workout.id,
                         startedAt = Instant.ofEpochMilli(workout.startedAtMillis),
                         distanceMeters = workout.distanceMeters,
                     )
+                }
             }
-            mutableState.value = mutableState.value.copy(monitoringEnabled = monitoring)
-            if (restored != null) scheduleDisconnectFinalization(Instant.now())
+            if (restored != null) scheduleDisconnectFinalization(clock.instant())
 
             client.state.collect { ftms ->
-                val previousConnection = mutableState.value.connection
                 val isRecording = recorder.activeId() != null
-                mutableState.value =
-                    mutableState.value.copy(
-                        connection = displayConnection(ftms.connection, isRecording),
-                        bike = ftms.selected,
-                        devices = ftms.devices,
-                        latest = ftms.latest,
-                        rawPacket = ftms.rawPacket,
-                        diagnostics = ftms.diagnostics,
-                        error = ftms.error,
-                    )
+                val previousConnection =
+                    mutableState.getAndUpdate {
+                        it.copy(
+                            connection = displayConnection(ftms.connection, isRecording),
+                            bike = ftms.selected,
+                            devices = ftms.devices,
+                            latest = ftms.latest,
+                            rawPacket = ftms.rawPacket,
+                            diagnostics = ftms.diagnostics,
+                            error = ftms.error,
+                        )
+                    }.connection
 
                 if (ftms.connection == ConnectionState.READY) {
                     disconnectJob?.cancel()
                     disconnectJob = null
                     retryJob?.cancel()
                     retryJob = null
-                    mutableState.value = mutableState.value.copy(reconnectDeadline = null)
+                    mutableState.update { it.copy(reconnectDeadline = null) }
                 }
 
                 val sample = ftms.latest
@@ -87,7 +93,7 @@ class BridgeController(
                     if (previousConnection in setOf(ConnectionState.READY, ConnectionState.RECORDING)) {
                         autoStartSuppressed = false
                     }
-                    if (recorder.activeId() != null) scheduleDisconnectFinalization(Instant.now())
+                    if (recorder.activeId() != null) scheduleDisconnectFinalization(clock.instant())
                     if (mutableState.value.monitoringEnabled && ftms.connection == ConnectionState.ERROR) {
                         scheduleConnectRetry()
                     }
@@ -101,34 +107,34 @@ class BridgeController(
     fun stopScan() = client.stopScan()
 
     fun connect(address: String) {
-        preferences.edit { putString(KEY_ADDRESS, address) }
+        environment.setLastBikeAddress(address)
         client.connect(address, mutableState.value.monitoringEnabled)
     }
 
     fun reconnectLastBike() {
-        preferences.getString(KEY_ADDRESS, null)?.let {
+        environment.lastBikeAddress()?.let {
             client.connect(it, mutableState.value.monitoringEnabled)
         } ?: client.startScan()
     }
 
     fun resumeMonitoring() {
-        if (!isMonitoringEnabled(context)) return
-        mutableState.value = mutableState.value.copy(monitoringEnabled = true)
-        preferences.getString(KEY_ADDRESS, null)?.let { client.connect(it, autoConnect = true) }
+        if (!environment.isMonitoringEnabled()) return
+        mutableState.update { it.copy(monitoringEnabled = true) }
+        environment.lastBikeAddress()?.let { client.connect(it, autoConnect = true) }
     }
 
     fun setMonitoringEnabled(enabled: Boolean) {
-        preferences.edit { putBoolean(KEY_MONITORING, enabled) }
-        mutableState.value = mutableState.value.copy(monitoringEnabled = enabled)
+        environment.setMonitoringEnabled(enabled)
+        mutableState.update { it.copy(monitoringEnabled = enabled) }
         if (enabled) {
-            RecordingService.start(context)
+            environment.startRecordingService()
         } else {
             scope.launch {
-                workoutMutex.withLock { finishActiveWorkout(lastMeasurementAt ?: Instant.now()) }
+                workoutMutex.withLock { finishActiveWorkout(lastMeasurementAt ?: clock.instant()) }
                 disconnectJob?.cancel()
                 retryJob?.cancel()
                 client.disconnect()
-                RecordingService.stop(context)
+                environment.stopRecordingService()
             }
         }
     }
@@ -140,7 +146,7 @@ class BridgeController(
             workoutMutex.withLock {
                 if (recorder.activeId() == null) startWorkoutLocked()
             }
-            RecordingService.start(context)
+            environment.startRecordingService()
         }
     }
 
@@ -148,9 +154,9 @@ class BridgeController(
         scope.launch {
             workoutMutex.withLock {
                 autoStartSuppressed = mutableState.value.monitoringEnabled
-                finishActiveWorkout(lastMeasurementAt ?: Instant.now())
+                finishActiveWorkout(lastMeasurementAt ?: clock.instant())
             }
-            if (!mutableState.value.monitoringEnabled) RecordingService.stop(context)
+            if (!mutableState.value.monitoringEnabled) environment.stopRecordingService()
         }
     }
 
@@ -166,47 +172,49 @@ class BridgeController(
             }
             if (recorder.activeId() != null) {
                 val distance = recorder.accept(sample)
-                mutableState.value =
-                    mutableState.value.copy(
+                mutableState.update {
+                    it.copy(
                         connection = ConnectionState.RECORDING,
                         distanceMeters = distance,
                     )
+                }
             }
         }
     }
 
-    private suspend fun startWorkoutLocked(at: Instant = Instant.now()) {
+    private suspend fun startWorkoutLocked(at: Instant = clock.instant()) {
         val workout = recorder.start(at)
-        mutableState.value =
-            mutableState.value.copy(
+        mutableState.update {
+            it.copy(
                 connection = ConnectionState.RECORDING,
                 recordingId = workout.id,
                 startedAt = Instant.ofEpochMilli(workout.startedAtMillis),
                 distanceMeters = 0.0,
                 error = null,
             )
+        }
     }
 
     private fun scheduleDisconnectFinalization(disconnectedAt: Instant) {
         if (disconnectJob?.isActive == true) return
         val lastData = lastMeasurementAt ?: disconnectedAt
-        val deadline = lastData.plusMillis(DISCONNECT_GRACE_MILLIS)
-        mutableState.value = mutableState.value.copy(reconnectDeadline = deadline)
+        val deadline = lastData.plusMillis(disconnectGraceMillis)
+        mutableState.update { it.copy(reconnectDeadline = deadline) }
         disconnectJob =
             scope.launch {
-                val remaining = deadline.toEpochMilli() - System.currentTimeMillis()
+                val remaining = deadline.toEpochMilli() - clock.instant().toEpochMilli()
                 if (remaining > 0) delay(remaining)
                 workoutMutex.withLock { finishActiveWorkout(lastData) }
-                mutableState.value = mutableState.value.copy(reconnectDeadline = null)
+                mutableState.update { it.copy(reconnectDeadline = null) }
             }
     }
 
     private fun scheduleConnectRetry() {
         if (retryJob?.isActive == true) return
-        val address = preferences.getString(KEY_ADDRESS, null) ?: return
+        val address = environment.lastBikeAddress() ?: return
         retryJob =
             scope.launch {
-                delay(RETRY_MILLIS)
+                delay(retryMillis)
                 if (mutableState.value.monitoringEnabled && client.state.value.connection != ConnectionState.READY) {
                     client.connect(address, autoConnect = true)
                 }
@@ -215,20 +223,19 @@ class BridgeController(
 
     private suspend fun finishActiveWorkout(at: Instant) {
         if (recorder.activeId() == null) return
-        mutableState.value = mutableState.value.copy(connection = ConnectionState.FINALIZING)
+        mutableState.update { it.copy(connection = ConnectionState.FINALIZING) }
         val completed = recorder.stop(at)
-        mutableState.value =
-            mutableState.value.copy(
+        mutableState.update {
+            it.copy(
                 connection = displayConnection(client.state.value.connection, false),
                 recordingId = null,
                 startedAt = null,
             )
-        if (completed != null) enqueueHealthSync()
+        }
+        if (completed != null) environment.enqueueHealthSync()
     }
 
-    private fun enqueueHealthSync() {
-        WorkManager.getInstance(context).enqueue(OneTimeWorkRequestBuilder<HealthSyncWorker>().build())
-    }
+    private fun enqueueHealthSync() = environment.enqueueHealthSync()
 
     private fun displayConnection(
         connection: ConnectionState,
@@ -242,12 +249,9 @@ class BridgeController(
         sample.elapsedTimeSeconds != null
 
     companion object {
-        private const val PREFERENCES = "bike"
-        private const val KEY_ADDRESS = "address"
-        private const val KEY_MONITORING = "background_monitoring"
         private const val DISCONNECT_GRACE_MILLIS = 5 * 60 * 1000L
         private const val RETRY_MILLIS = 10_000L
 
-        fun isMonitoringEnabled(context: Context): Boolean = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).getBoolean(KEY_MONITORING, false)
+        fun isMonitoringEnabled(context: Context): Boolean = AndroidBridgeEnvironment(context).isMonitoringEnabled()
     }
 }

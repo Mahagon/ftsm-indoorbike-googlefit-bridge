@@ -19,6 +19,7 @@ import dev.frakw.ftmsbridge.model.DiscoveredBike
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import java.time.Instant
 import java.util.UUID
 
@@ -46,10 +47,13 @@ class AndroidFtmsClient(
                 val address = result.device.address
                 val name = result.scanRecord?.deviceName ?: result.device.name ?: "FTMS bike"
                 val device = DiscoveredBike(name, address, result.rssi)
-                val devices =
-                    (mutableState.value.devices.filterNot { it.address == address } + device)
-                        .sortedByDescending { it.signalDbm }
-                mutableState.value = mutableState.value.copy(devices = devices)
+                mutableState.update {
+                    it.copy(
+                        devices =
+                        (it.devices.filterNot { existing -> existing.address == address } + device)
+                            .sortedByDescending { discovered -> discovered.signalDbm },
+                    )
+                }
             }
 
             override fun onScanFailed(errorCode: Int) = fail("Bluetooth scan failed ($errorCode)")
@@ -62,6 +66,10 @@ class AndroidFtmsClient(
                 status: Int,
                 newState: Int,
             ) {
+                if (!isCurrent(gatt)) {
+                    gatt.close()
+                    return
+                }
                 when {
                     status != BluetoothGatt.GATT_SUCCESS -> {
                         fail("Bike disconnected (GATT $status)")
@@ -69,13 +77,13 @@ class AndroidFtmsClient(
 
                     newState == BluetoothProfile.STATE_CONNECTED -> {
                         addDiagnostic("Connected; discovering services")
-                        mutableState.value = mutableState.value.copy(connection = ConnectionState.CONNECTING)
+                        mutableState.update { it.copy(connection = ConnectionState.CONNECTING) }
                         gatt.discoverServices()
                     }
 
                     newState == BluetoothProfile.STATE_DISCONNECTED -> {
                         sampleAccumulator.reset()
-                        mutableState.value = mutableState.value.copy(connection = ConnectionState.DISCONNECTED, latest = null)
+                        mutableState.update { it.copy(connection = ConnectionState.DISCONNECTED, latest = null) }
                         if (!autoConnect) {
                             gatt.close()
                             if (this@AndroidFtmsClient.gatt === gatt) this@AndroidFtmsClient.gatt = null
@@ -88,6 +96,7 @@ class AndroidFtmsClient(
                 gatt: BluetoothGatt,
                 status: Int,
             ) {
+                if (!isCurrent(gatt)) return
                 if (status != BluetoothGatt.GATT_SUCCESS) return fail("Service discovery failed ($status)")
                 val service =
                     gatt.getService(FTMS_SERVICE)
@@ -109,10 +118,11 @@ class AndroidFtmsClient(
                 descriptor: BluetoothGattDescriptor,
                 status: Int,
             ) {
+                if (!isCurrent(gatt)) return
                 if (descriptor.uuid != CCCD) return
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     addDiagnostic("Indoor Bike Data notifications enabled")
-                    mutableState.value = mutableState.value.copy(connection = ConnectionState.READY, error = null)
+                    mutableState.update { it.copy(connection = ConnectionState.READY, error = null) }
                 } else {
                     fail("Notification descriptor write failed ($status)")
                 }
@@ -123,22 +133,24 @@ class AndroidFtmsClient(
                 characteristic: BluetoothGattCharacteristic,
                 value: ByteArray,
             ) {
+                if (!isCurrent(gatt)) return
                 if (characteristic.uuid != INDOOR_BIKE_DATA) return
                 val raw = value.toHex()
                 when (val result = parser.parse(value, Instant.now())) {
                     is FtmsPacketParser.Result.Success -> {
                         val merged = sampleAccumulator.merge(result.sample)
-                        mutableState.value =
-                            mutableState.value.copy(
+                        mutableState.update {
+                            it.copy(
                                 latest = merged,
                                 rawPacket = raw,
                                 error = null,
                             )
+                        }
                     }
 
                     is FtmsPacketParser.Result.Failure -> {
                         addDiagnostic("Rejected $raw: ${result.reason}")
-                        mutableState.value = mutableState.value.copy(rawPacket = raw, error = result.reason)
+                        mutableState.update { it.copy(rawPacket = raw, error = result.reason) }
                     }
                 }
             }
@@ -146,12 +158,13 @@ class AndroidFtmsClient(
 
     override fun startScan() {
         if (adapter?.isEnabled != true) return fail("Bluetooth is turned off")
-        mutableState.value =
-            mutableState.value.copy(
+        mutableState.update {
+            it.copy(
                 connection = ConnectionState.SCANNING,
                 devices = emptyList(),
                 error = null,
             )
+        }
         val filter = ScanFilter.Builder().setServiceUuid(ParcelUuid(FTMS_SERVICE)).build()
         val settings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
         scanner?.startScan(listOf(filter), settings, scanCallback) ?: fail("BLE scanner unavailable")
@@ -159,8 +172,12 @@ class AndroidFtmsClient(
 
     override fun stopScan() {
         scanner?.stopScan(scanCallback)
-        if (mutableState.value.connection == ConnectionState.SCANNING) {
-            mutableState.value = mutableState.value.copy(connection = ConnectionState.DISCONNECTED)
+        mutableState.update {
+            if (it.connection == ConnectionState.SCANNING) {
+                it.copy(connection = ConnectionState.DISCONNECTED)
+            } else {
+                it
+            }
         }
     }
 
@@ -170,16 +187,16 @@ class AndroidFtmsClient(
     ) {
         stopScan()
         val device = adapter?.getRemoteDevice(address) ?: return fail("Bike address is invalid")
-        val selected =
-            mutableState.value.devices.firstOrNull { it.address == address }
-                ?: DiscoveredBike(device.name ?: "FTMS bike", address, 0)
-        mutableState.value =
-            mutableState.value.copy(
+        mutableState.update {
+            it.copy(
                 connection = ConnectionState.CONNECTING,
-                selected = selected,
+                selected =
+                it.devices.firstOrNull { discovered -> discovered.address == address }
+                    ?: DiscoveredBike(device.name ?: "FTMS bike", address, 0),
                 latest = null,
                 error = null,
             )
+        }
         sampleAccumulator.reset()
         this.autoConnect = autoConnect
         gatt?.close()
@@ -193,20 +210,23 @@ class AndroidFtmsClient(
         gatt = null
         autoConnect = false
         sampleAccumulator.reset()
-        mutableState.value = mutableState.value.copy(connection = ConnectionState.DISCONNECTED, latest = null)
+        mutableState.update { it.copy(connection = ConnectionState.DISCONNECTED, latest = null) }
     }
+
+    private fun isCurrent(callbackGatt: BluetoothGatt): Boolean = gatt === callbackGatt
 
     private fun addDiagnostic(message: String) {
         val line = "${Instant.now()}  $message"
-        mutableState.value =
-            mutableState.value.copy(
-                diagnostics = (mutableState.value.diagnostics + line).takeLast(200),
+        mutableState.update {
+            it.copy(
+                diagnostics = (it.diagnostics + line).takeLast(200),
             )
+        }
     }
 
     private fun fail(message: String) {
         addDiagnostic(message)
-        mutableState.value = mutableState.value.copy(connection = ConnectionState.ERROR, error = message)
+        mutableState.update { it.copy(connection = ConnectionState.ERROR, error = message) }
     }
 
     companion object {

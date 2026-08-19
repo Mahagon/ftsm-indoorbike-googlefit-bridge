@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import dev.frakw.ftmsbridge.BridgeApplication
+import kotlinx.coroutines.CancellationException
 
 class HealthSyncWorker(
     context: Context,
@@ -18,6 +19,8 @@ class HealthSyncWorker(
             try {
                 app.healthWriter.write(value)
                 app.database.workouts().markSynced(workout.id)
+            } catch (error: CancellationException) {
+                throw error
             } catch (error: Exception) {
                 app.database.workouts().markSyncFailed(workout.id, error.message ?: error.javaClass.simpleName)
                 retry = true
