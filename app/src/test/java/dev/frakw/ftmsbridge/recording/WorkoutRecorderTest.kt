@@ -5,6 +5,7 @@ import dev.frakw.ftmsbridge.data.WorkoutDao
 import dev.frakw.ftmsbridge.data.WorkoutEntity
 import dev.frakw.ftmsbridge.data.WorkoutWithSamples
 import dev.frakw.ftmsbridge.model.IndoorBikeSample
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -91,6 +92,16 @@ class WorkoutRecorderTest {
         override suspend fun workout(id: String) = workouts[id]?.let { workout ->
             WorkoutWithSamples(workout, samples.values.filter { it.workoutId == id })
         }
+
+        override fun completedWorkouts(limit: Int) = flowOf(
+            workouts.values.filter { it.state == WorkoutEntity.STATE_COMPLETE }.sortedByDescending { it.startedAtMillis }.take(limit),
+        )
+
+        override fun observeCompletedWorkout(id: String) = flowOf(
+            workouts[id]
+                ?.takeIf { it.state == WorkoutEntity.STATE_COMPLETE }
+                ?.let { WorkoutWithSamples(it, samples.values.filter { sample -> sample.workoutId == id }) },
+        )
 
         override suspend fun pendingSync() = workouts.values.filter { it.state == WorkoutEntity.STATE_COMPLETE && !it.synced }
 

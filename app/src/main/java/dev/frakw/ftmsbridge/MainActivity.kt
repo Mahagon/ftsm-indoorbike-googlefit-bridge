@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -27,7 +28,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -35,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,6 +44,10 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.frakw.ftmsbridge.history.HistoryRoute
+import dev.frakw.ftmsbridge.history.HistoryViewModel
+import dev.frakw.ftmsbridge.history.WorkoutDetailRoute
 import dev.frakw.ftmsbridge.model.BridgeState
 import dev.frakw.ftmsbridge.model.ConnectionState
 import kotlinx.coroutines.delay
@@ -83,8 +88,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme(colorScheme = lightColorScheme()) {
+            FtmsBridgeTheme {
                 val state by app.controller.state.collectAsStateWithLifecycle()
+                val historyViewModel = viewModel { HistoryViewModel(app.database.workouts()) }
+                var destination by rememberSaveable { mutableStateOf(DESTINATION_MAIN) }
+                var selectedWorkout by rememberSaveable { mutableStateOf<String?>(null) }
                 val keepScreenAwake = shouldKeepScreenAwake(state.connection)
                 DisposableEffect(keepScreenAwake) {
                     if (keepScreenAwake) {
@@ -98,24 +106,61 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
-                BridgeScreen(
-                    state = state,
-                    onConnectSetup = ::ensureBluetooth,
-                    onScan = app.controller::scan,
-                    onConnect = app.controller::connect,
-                    onStart = {
-                        if (hasBluetoothPermissions()) {
-                            healthLauncher.launch(app.healthWriter.permissions)
-                            app.controller.startWorkout()
-                        } else {
-                            ensureBluetooth()
-                        }
-                    },
-                    onStop = app.controller::stopWorkout,
-                    onMonitoringChanged = ::setMonitoringEnabled,
-                    onHealthPermissions = { healthLauncher.launch(app.healthWriter.permissions) },
-                    onShareDiagnostics = { shareDiagnostics(state) },
-                )
+                BackHandler(destination != DESTINATION_MAIN) {
+                    if (destination == DESTINATION_DETAIL) {
+                        destination = DESTINATION_HISTORY
+                    } else {
+                        destination = DESTINATION_MAIN
+                    }
+                }
+                when (destination) {
+                    DESTINATION_HISTORY -> HistoryRoute(
+                        viewModel = historyViewModel,
+                        onBack = { destination = DESTINATION_MAIN },
+                        onWorkout = {
+                            selectedWorkout = it
+                            destination = DESTINATION_DETAIL
+                        },
+                    )
+
+                    DESTINATION_DETAIL -> if (selectedWorkout != null) {
+                        WorkoutDetailRoute(
+                            workoutId = selectedWorkout!!,
+                            viewModel = historyViewModel,
+                            onBack = { destination = DESTINATION_HISTORY },
+                            onRetrySync = { healthLauncher.launch(app.healthWriter.permissions) },
+                        )
+                    } else {
+                        HistoryRoute(
+                            viewModel = historyViewModel,
+                            onBack = { destination = DESTINATION_MAIN },
+                            onWorkout = {
+                                selectedWorkout = it
+                                destination = DESTINATION_DETAIL
+                            },
+                        )
+                    }
+
+                    else -> BridgeScreen(
+                        state = state,
+                        onConnectSetup = ::ensureBluetooth,
+                        onScan = app.controller::scan,
+                        onConnect = app.controller::connect,
+                        onStart = {
+                            if (hasBluetoothPermissions()) {
+                                healthLauncher.launch(app.healthWriter.permissions)
+                                app.controller.startWorkout()
+                            } else {
+                                ensureBluetooth()
+                            }
+                        },
+                        onStop = app.controller::stopWorkout,
+                        onMonitoringChanged = ::setMonitoringEnabled,
+                        onHealthPermissions = { healthLauncher.launch(app.healthWriter.permissions) },
+                        onHistory = { destination = DESTINATION_HISTORY },
+                        onShareDiagnostics = { shareDiagnostics(state) },
+                    )
+                }
             }
         }
     }
@@ -160,6 +205,12 @@ class MainActivity : ComponentActivity() {
             ),
         )
     }
+
+    companion object {
+        private const val DESTINATION_MAIN = "main"
+        private const val DESTINATION_HISTORY = "history"
+        private const val DESTINATION_DETAIL = "detail"
+    }
 }
 
 internal fun shouldKeepScreenAwake(connection: ConnectionState): Boolean = connection == ConnectionState.READY || connection == ConnectionState.RECORDING
@@ -174,6 +225,7 @@ private fun BridgeScreen(
     onStop: () -> Unit,
     onMonitoringChanged: (Boolean) -> Unit,
     onHealthPermissions: () -> Unit,
+    onHistory: () -> Unit,
     onShareDiagnostics: () -> Unit,
 ) {
     var diagnostics by remember { mutableStateOf(false) }
@@ -254,6 +306,7 @@ private fun BridgeScreen(
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = onHistory) { Text("History") }
                     TextButton(onClick = onHealthPermissions) { Text("Health permissions") }
                     TextButton(onClick = { diagnostics = !diagnostics }) { Text("Diagnostics") }
                 }

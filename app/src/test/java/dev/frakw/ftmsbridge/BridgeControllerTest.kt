@@ -12,6 +12,7 @@ import dev.frakw.ftmsbridge.recording.WorkoutRecorder
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -288,6 +289,16 @@ class BridgeControllerTest {
         override suspend fun workout(id: String) = workouts[id]?.let { workout ->
             WorkoutWithSamples(workout, samples.values.filter { it.workoutId == id })
         }
+
+        override fun completedWorkouts(limit: Int) = flowOf(
+            workouts.values.filter { it.state == WorkoutEntity.STATE_COMPLETE }.sortedByDescending { it.startedAtMillis }.take(limit),
+        )
+
+        override fun observeCompletedWorkout(id: String) = flowOf(
+            workouts[id]
+                ?.takeIf { it.state == WorkoutEntity.STATE_COMPLETE }
+                ?.let { WorkoutWithSamples(it, samples.values.filter { sample -> sample.workoutId == id }) },
+        )
 
         override suspend fun pendingSync() = workouts.values.filter { it.state == WorkoutEntity.STATE_COMPLETE && !it.synced }
 
