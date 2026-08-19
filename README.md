@@ -1,91 +1,177 @@
 # FTMS Indoor Bike Google Fit Bridge
 
-An Android app that records an FTMS-compatible indoor bike over Bluetooth LE and writes the completed workout to Android Health Connect. Google Fit can then display the synchronized stationary-cycling workout.
+FTMS Bike Bridge is an Android app that records workouts from an FTMS-compatible indoor bike over Bluetooth Low Energy. Workouts are saved in the app, exported to Android Health Connect, and can then appear in Google Fit.
 
-The first version records duration, speed, cycling cadence, power, and distance. It intentionally does not control resistance, estimate calories, or use the deprecated Google Fit API.
+## Features
+
+- Records duration, distance, speed, cycling cadence, and power.
+- Keeps a local, paginated workout history with summary statistics and Health Connect sync status.
+- Supports manual recording or automatic background monitoring and recording.
+- Restores background monitoring after a phone restart.
+- Continues recording with the screen off and tolerates a bike disconnect for up to five minutes.
+- Writes completed stationary-cycling sessions and available metric samples to Health Connect.
+- Follows the phone's light or dark appearance setting.
+- Checks GitHub Releases for signed updates and verifies downloaded APKs before installation.
+
+The app does not control resistance, estimate calories, or use the deprecated Google Fit API.
 
 ## Requirements
 
-- Android Studio with JDK 17
-- Android 17 / API 37 SDK and Android SDK Platform-Tools
-- An Android 14+ phone with Bluetooth LE and Health Connect
-- A bike exposing the FTMS service (`0x1826`) and Indoor Bike Data characteristic (`0x2AD2`)
+- An Android 14 or newer phone with Bluetooth Low Energy and Health Connect.
+- An indoor bike exposing the Fitness Machine Service (`0x1826`) and Indoor Bike Data characteristic (`0x2AD2`).
+- No other app, such as Zwift or Kinomap, connected to the bike at the same time.
 
-## Build and install
+Health Connect is built into Android 14 and newer. See the [Android Health Connect documentation](https://developer.android.com/health-and-fitness/health-connect/availability) for platform details.
 
-1. Open this repository in Android Studio and allow Gradle sync to complete.
-2. Connect the phone with USB debugging enabled.
-3. Select the `app` run configuration and run it on the phone, or execute `./gradlew installDebug`.
-4. Grant Nearby devices, notification, and requested Health Connect permissions.
+## Install
 
-The package name is `dev.frakw.ftmsbridge`. This repository is GPLv3 licensed.
+1. Open the [latest GitHub release](https://github.com/Mahagon/ftsm-indoorbike-googlefit-bridge/releases/latest).
+2. Download the `ftms-bridge-vX.Y.Z.apk` asset, not the source archives or `.sha256` file.
+3. Open the APK on the phone and approve installation from the browser or file manager if Android asks.
+4. Launch **FTMS Bike Bridge** and grant Nearby devices, notification, and Health Connect permissions when requested.
 
-## Record a workout
+The Android package name is `dev.frakw.ftmsbridge`. Updates must be signed with the same release key as the installed version.
 
-1. Wake the bike by pedaling and ensure another app is not connected to it.
-2. Tap **Scan**, select the FTMS bike, and wait for **Ready**.
-3. Tap **Start workout** and ride. Recording continues while the screen is off.
-4. Tap **Stop and save**. The workout is persisted first and then written to Health Connect.
-5. In Google Fit, enable **Profile → Settings → Sync Fit with Health Connect** and grant Fit access to exercise and activity data.
+## Connect a bike
 
-Health Connect remains the source of truth. Google Fit may display the session and distance without rendering every cadence or power sample in its own interface.
+1. Wake the bike by pedaling.
+2. Ensure other fitness apps are disconnected from it.
+3. Tap **Scan** in FTMS Bike Bridge.
+4. Select the bike and wait for the app to show **Ready**.
 
-Completed workouts are also available under **History** in the app. Open a workout to see its duration, distance, synchronization state, and average and maximum speed, cadence, and power when those metrics were recorded.
+The selected bike is remembered for future reconnections.
+
+## Record workouts
+
+### Manual recording
+
+1. Connect the bike and wait for **Ready**.
+2. Tap **Start workout** and ride.
+3. Tap **Stop and save** when finished.
+
+The workout is saved locally before a background task exports it to Health Connect. Recording continues while the screen is off.
+
+### Background monitoring
+
+Enable **Background monitoring** to let the app reconnect to the remembered bike and begin recording automatically when bike measurements arrive. Monitoring runs through a foreground notification and resumes after the phone restarts.
+
+If the bike disconnects during a workout, the app waits up to five minutes for it to reconnect. If it does not return, the workout is finalized at the time of the last measurement. Use **Finish now** to end an automatically started workout immediately.
+
+## Workout history
+
+Tap **History** to view completed workouts, newest first. The app loads history in batches of 20; use **Load more** to retrieve older entries.
+
+Each entry shows its date, duration, distance, and Health Connect state:
+
+- **Pending:** waiting to be exported.
+- **Synced:** successfully written to Health Connect.
+- **Failed:** export failed; open the workout to see the error and tap **Retry sync**.
+
+Workout details include average and maximum speed, cadence, and power when the bike supplied those measurements.
+
+Workouts recorded by affected older releases may show that detailed metrics are unavailable. Those releases deleted their local sample rows while updating the workout, so the missing historical samples cannot be reconstructed. Workouts recorded after the fix retain their samples.
+
+## Health Connect and Google Fit
+
+FTMS Bike Bridge stores workouts locally and exports completed records to Health Connect. It does not communicate with Google Fit directly.
+
+To display the shared workouts in Google Fit:
+
+1. Open Google Fit.
+2. Open **Profile → Settings**.
+3. Under **Health Connect**, enable **Sync Fit with Health Connect**.
+4. Grant Google Fit access to the relevant exercise and activity data.
+
+Google maintains the current setup steps in [Health Connect on Google Fit](https://support.google.com/fit/answer/12830119). Google Fit may show the session and distance without rendering every cadence or power sample in its own interface.
 
 ## App updates
 
-Signed release builds check GitHub Releases for a newer stable version at most once per day. You can also use **Check updates** on the main screen. The app downloads the matching APK and checksum only after you choose **Update**, verifies them, and then opens Android's installer. Android may first ask you to allow FTMS Bike Bridge as an installation source and always asks you to confirm the update.
+Signed release builds check for a newer stable GitHub release at most once every 24 hours when the app opens or resumes. Tap **Check updates** to check immediately.
 
-Debug builds do not check for or install release updates.
+When an update is available:
 
-## Diagnostics
+1. Tap **Update** to download the release APK and its published SHA-256 checksum over the current network connection.
+2. Wait while the app verifies the checksum, Android package ID, and version.
+3. Tap **Install** and follow Android's confirmation flow.
 
-Open **Diagnostics** in the app to inspect the last raw FTMS packet and the discovered GATT characteristics. Use **Share diagnostic log** when a JC-series firmware exposes different fields or fails to connect.
+Android may first open the **Install unknown apps** setting so FTMS Bike Bridge can request the update. Installation is disabled while a workout is recording or being finalized. Choosing **Later** hides that release for 24 hours.
 
-Common problems:
+Debug builds do not check for or install releases. A version installed before the updater was introduced must be upgraded manually once; updater-enabled releases can handle later upgrades.
 
-- **Bike not found:** pedal to wake it, disconnect Kinomap/Zwift or other bike apps, and scan again.
-- **No metrics:** share the diagnostic log; the bike may use a non-standard packet layout.
-- **Workout remains pending:** open Health permissions, grant all write permissions, then return to the app to retry synchronization.
-- **Workout absent in Fit:** confirm it exists in Health Connect first and that Google Fit Health Connect synchronization is enabled.
+## Diagnostics and troubleshooting
 
-## Verification
+Open **Diagnostics** to inspect the latest raw FTMS packet and discovered GATT characteristics. Use **Share diagnostic log** when reporting a bike compatibility problem.
 
-Run all local quality checks with:
+- **Bike not found:** pedal to wake it, disconnect other bike apps, and scan again.
+- **Bike connects but metrics remain empty:** inspect and share the diagnostic log; the firmware may use a non-standard FTMS packet layout.
+- **Old workout has no detailed metrics:** samples lost by an affected older release cannot be recovered. New rides recorded after the fix should contain them.
+- **Workout remains pending or failed:** open **Health permissions**, grant all requested write permissions, then retry from the workout details.
+- **Workout is absent in Google Fit:** confirm it exists in Health Connect, then confirm Google Fit synchronization and permissions.
+- **Update check fails:** verify internet access and retry with **Check updates**. Releases must contain both the expected APK and matching `.sha256` asset.
+- **Android rejects an update:** install the APK signed by the same key as the existing app, or uninstall the old app first. Uninstalling removes local app data.
+
+## Build from source
+
+Development requires:
+
+- Android Studio with JDK 17.
+- Android SDK Platform 36 and Android SDK Build-Tools 36.0.0.
+
+Clone the repository, open it in Android Studio, and allow Gradle sync to finish. Run the `app` configuration on an Android 14+ phone, or install a debug build from the command line:
+
+```shell
+./gradlew installDebug
+```
+
+The project compiles and targets API 36 and has a minimum SDK of API 34.
+
+## Verification and CI
+
+Run the local quality checks with:
 
 ```shell
 ./gradlew spotlessCheck testDebugUnitTest lintDebug
 ```
 
-Use `./gradlew spotlessApply` to apply Kotlin and repository formatting. Pull requests and pushes to `main` run these checks in GitHub Actions. Configure `quality` as a required status check in the `main` branch protection rules.
+Use `./gradlew spotlessApply` to apply Kotlin and repository formatting. Pull requests and pushes to `main` run the same checks in GitHub Actions.
 
-Hardware acceptance should cover a 30-minute screen-off ride, a forced Bluetooth disconnect/reconnect, confirmation of the records in Health Connect Toolbox, and confirmation of one non-duplicated workout in Google Fit.
+Hardware acceptance should cover:
 
-## Signed releases
+- A screen-off ride of at least 30 minutes.
+- A forced Bluetooth disconnect and reconnect.
+- Workout details containing the recorded metric summaries.
+- One non-duplicated session in Health Connect and Google Fit.
+- A signed update from one release version to the next.
 
-The release workflow builds and publishes a signed APK plus its SHA-256 checksum when a semantic version tag such as `v1.2.3` is pushed. Create a protected GitHub Actions environment named `release` and add these environment secrets:
+## Publishing signed releases
+
+The release workflow runs for tags matching `vMAJOR.MINOR.PATCH`. It derives Android's version name and version code from the tag, runs the quality checks, builds a signed APK, and publishes the APK plus its SHA-256 checksum to GitHub Releases.
+
+Create a protected GitHub Actions environment named `release` with these secrets:
 
 - `ANDROID_RELEASE_KEYSTORE_BASE64`
 - `ANDROID_RELEASE_STORE_PASSWORD`
 - `ANDROID_RELEASE_KEY_ALIAS`
 - `ANDROID_RELEASE_KEY_PASSWORD`
 
-Create and back up a release key outside this repository:
+Create and back up the release key outside this repository:
 
 ```powershell
 keytool -genkeypair -v -keystore ftms-bridge-release.jks -alias ftms-bridge -keyalg RSA -keysize 4096 -validity 10000
 [Convert]::ToBase64String([IO.File]::ReadAllBytes("ftms-bridge-release.jks")) | Set-Clipboard
 ```
 
-Paste the clipboard value into `ANDROID_RELEASE_KEYSTORE_BASE64`, store the passwords and alias in the other secrets, and keep the original keystore and passwords in a secure backup. Losing this key prevents future updates from replacing an installed release.
+Store the Base64 value and matching credentials in the release environment. Keep the original keystore and passwords in a secure backup: losing the key prevents future APKs from updating existing installations.
 
-After CI succeeds, create a release with:
+After CI succeeds, publish a new semantic version by pushing its tag, for example:
 
 ```shell
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.2.0
+git push origin v0.2.0
 ```
 
-## Protocol reference
+## Protocol and license
 
-The FTMS parser follows the Bluetooth Fitness Machine Service flag layout. The Windows/Unity project [frakw/BLE_FTMS_IndoorBike](https://github.com/frakw/BLE_FTMS_IndoorBike) is useful for comparing real-bike behavior but none of its WinRT binaries or source are included here.
+The FTMS parser follows the Bluetooth Fitness Machine Service flag layout. The Windows/Unity project [frakw/BLE_FTMS_IndoorBike](https://github.com/frakw/BLE_FTMS_IndoorBike) is useful for comparing real-bike behavior, but none of its WinRT binaries or source are included here.
+
+FTMS Bike Bridge is licensed under the [GNU General Public License v3.0](LICENSE).
