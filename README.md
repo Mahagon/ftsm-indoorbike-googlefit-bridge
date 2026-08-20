@@ -2,6 +2,8 @@
 
 FTMS Bike Bridge is an Android app that records workouts from an FTMS-compatible indoor bike over Bluetooth Low Energy. Workouts are saved in the app, exported to Android Health Connect, and can then appear in Google Fit.
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) to contribute and [SECURITY.md](SECURITY.md) to report a vulnerability privately.
+
 ## Features
 
 - Records duration, distance, speed, cycling cadence, and power.
@@ -174,12 +176,7 @@ keytool -genkeypair -v -keystore ftms-bridge-release.jks -alias ftms-bridge -key
 
 Store the Base64 value and matching credentials in the release environment. Keep the original keystore and passwords in a secure backup: losing the key prevents future APKs from updating existing installations.
 
-After CI succeeds, publish a new semantic version by pushing its tag, for example:
-
-```shell
-git tag v0.2.0
-git push origin v0.2.0
-```
+Human pull-request branches use the next semantic version without a `v` prefix, such as `0.2.0`. The version check requires that branch version to be greater than the latest release. After the pull request is merged into `main`, automation creates the matching `v0.2.0` tag and starts this release workflow. Dependabot pull requests are exempt and do not create releases.
 
 ## Protocol and license
 
