@@ -18,7 +18,7 @@ jobs:
           java-version: "17"
       - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
       - name: Install Android SDK
-        run: sdkmanager "platforms;android-37" "build-tools;37.0.0"
+        run: sdkmanager "platforms;android-37" "build-tools;37.0.0" --channel=3
       - uses: gradle/actions/setup-gradle@4733eaac7c1b0da527e4206b7671e0061de1ce37 # v6
       - name: Test release version policy
         run: python .github/scripts/release_version_test.py
@@ -53,6 +53,7 @@ jobs:
         uses: ReactiveCircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808 # v2
         with:
           api-level: 37
+          channel: canary
           target: google_apis
           arch: x86_64
           # The Android SDK has no pixel_7a AVD profile; Pixel 7 is the closest supported device.
