@@ -8,6 +8,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) to contribute and [SECURITY.md](SECURITY.
 
 - Records duration, distance, speed, cycling cadence, and power.
 - Keeps a local, paginated workout history with summary statistics and Health Connect sync status.
+- Protects local workout history with encrypted Android cloud backup and configurable retention.
 - Supports one-session duration or distance targets with live progress.
 - Supports manual recording or automatic background monitoring and recording.
 - Restores background monitoring after a phone restart.
@@ -84,6 +85,14 @@ If the workout had a target, its details also show the planned value and whether
 
 Workouts recorded by affected older releases may show that detailed metrics are unavailable. Those releases deleted their local sample rows while updating the workout, so the missing historical samples cannot be reconstructed. Workouts recorded after the fix retain their samples.
 
+## Backup and storage retention
+
+Android Auto Backup stores the workout database in the private backup area of the phone's Google account when Android backup and client-side encryption are available. The backup is not a visible Google Drive file. Android schedules backups and restores eligible data during app installation or device setup; the app cannot trigger an immediate backup or restore.
+
+Tap **Storage** to configure how many cumulative training hours remain in local history. The default is 36 hours, which is approximately 20 MiB with one sample stored per second. Cleanup removes the oldest workouts only after they have synced to Health Connect. Active, unsynced, and the newest completed workout are protected, so storage can temporarily exceed the configured retention value.
+
+The Storage screen shows the measured database size. A warning also appears on the main screen when the database exceeds the recommended 20 MiB target or protected workouts prevent cleanup. Android limits Auto Backup to 25 MB per app, so grant Health Connect permissions or reduce retention if the warning persists.
+
 ## Health Connect and Google Fit
 
 FTMS Bike Bridge stores workouts locally and exports completed records to Health Connect. It does not communicate with Google Fit directly.
@@ -136,7 +145,7 @@ Clone the repository, open it in Android Studio, and allow Gradle sync to finish
 ./gradlew installDebug
 ```
 
-The project compiles and targets API 36 and has a minimum SDK of API 34.
+The project compiles and targets API 37 and has a minimum SDK of API 34.
 
 ## Verification and CI
 

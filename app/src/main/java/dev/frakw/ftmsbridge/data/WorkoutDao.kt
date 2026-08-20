@@ -29,6 +29,12 @@ interface WorkoutDao {
     @Query("SELECT * FROM workouts WHERE state = 'COMPLETE' ORDER BY startedAtMillis DESC LIMIT :limit")
     fun completedWorkouts(limit: Int): Flow<List<WorkoutEntity>>
 
+    @Query("SELECT * FROM workouts WHERE state = 'COMPLETE' ORDER BY startedAtMillis")
+    suspend fun completedWorkoutsForRetention(): List<WorkoutEntity>
+
+    @Query("DELETE FROM workouts WHERE id = :id AND state = 'COMPLETE'")
+    suspend fun deleteCompletedWorkout(id: String): Int
+
     @Transaction
     @Query("SELECT * FROM workouts WHERE id = :id AND state = 'COMPLETE'")
     fun observeCompletedWorkout(id: String): Flow<WorkoutWithSamples?>

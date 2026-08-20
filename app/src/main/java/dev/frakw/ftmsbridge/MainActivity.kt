@@ -62,6 +62,11 @@ import dev.frakw.ftmsbridge.history.WorkoutDetailRoute
 import dev.frakw.ftmsbridge.model.BridgeState
 import dev.frakw.ftmsbridge.model.ConnectionState
 import dev.frakw.ftmsbridge.model.WorkoutTarget
+import dev.frakw.ftmsbridge.retention.RetentionScreen
+import dev.frakw.ftmsbridge.retention.RetentionStatus
+import dev.frakw.ftmsbridge.retention.RetentionViewModel
+import dev.frakw.ftmsbridge.retention.RetentionWarningCard
+import dev.frakw.ftmsbridge.retention.TrainingRetentionManager
 import dev.frakw.ftmsbridge.update.UpdateStatus
 import dev.frakw.ftmsbridge.update.UpdateUiState
 import dev.frakw.ftmsbridge.update.UpdateViewModel
@@ -109,10 +114,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        TrainingRetentionManager.schedule(this)
         setContent {
             FtmsBridgeTheme {
                 val state by app.controller.state.collectAsStateWithLifecycle()
                 val historyViewModel = viewModel { HistoryViewModel(app.database.workouts()) }
+                val retentionViewModel = viewModel { RetentionViewModel(app.retention) }
+                val retentionStatus by retentionViewModel.status.collectAsStateWithLifecycle()
                 val updater = viewModel { UpdateViewModel(application) }
                 updateViewModel = updater
                 val updateState by updater.state.collectAsStateWithLifecycle()
@@ -203,6 +211,12 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
+                        DESTINATION_RETENTION -> RetentionScreen(
+                            status = retentionStatus,
+                            onSave = retentionViewModel::saveHours,
+                            onBack = { destination = DESTINATION_MAIN },
+                        )
+
                         else -> BridgeScreen(
                             state = state,
                             onConnectSetup = ::ensureBluetooth,
@@ -221,6 +235,8 @@ class MainActivity : ComponentActivity() {
                             onTargetChanged = app.controller::setNextWorkoutTarget,
                             onHealthPermissions = { healthLauncher.launch(app.healthWriter.permissions) },
                             onHistory = { destination = DESTINATION_HISTORY },
+                            retentionStatus = retentionStatus,
+                            onRetention = { destination = DESTINATION_RETENTION },
                             updateState = updateState,
                             updatesEnabled = !BuildConfig.DEBUG,
                             updateInstallAllowed = state.recordingId == null && state.connection != ConnectionState.FINALIZING,
@@ -309,6 +325,7 @@ class MainActivity : ComponentActivity() {
         private const val DESTINATION_MAIN = "main"
         private const val DESTINATION_HISTORY = "history"
         private const val DESTINATION_DETAIL = "detail"
+        private const val DESTINATION_RETENTION = "retention"
     }
 }
 
@@ -328,6 +345,8 @@ private fun BridgeScreen(
     onTargetChanged: (WorkoutTarget?) -> Unit,
     onHealthPermissions: () -> Unit,
     onHistory: () -> Unit,
+    retentionStatus: RetentionStatus,
+    onRetention: () -> Unit,
     updateState: UpdateUiState,
     updatesEnabled: Boolean,
     updateInstallAllowed: Boolean,
@@ -354,6 +373,9 @@ private fun BridgeScreen(
             item {
                 Text("FTMS Bike Bridge", style = MaterialTheme.typography.headlineMedium)
                 Text(stateLabel(state), color = MaterialTheme.colorScheme.primary)
+            }
+            retentionStatus.warning?.let { message ->
+                item { RetentionWarningCard(message) }
             }
             if (updatesEnabled && updateState.status != UpdateStatus.IDLE) {
                 item {
@@ -447,6 +469,7 @@ private fun BridgeScreen(
                         if (updatesEnabled) {
                             TextButton(onClick = onCheckUpdates) { Text("Check updates") }
                         }
+                        TextButton(onClick = onRetention) { Text("Storage") }
                         TextButton(onClick = { diagnostics = !diagnostics }) { Text("Diagnostics") }
                     }
                 }

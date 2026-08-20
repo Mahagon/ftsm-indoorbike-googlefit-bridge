@@ -7,6 +7,7 @@ import androidx.work.WorkManager
 import dev.frakw.ftmsbridge.health.HealthSyncWorker
 import dev.frakw.ftmsbridge.model.WorkoutTarget
 import dev.frakw.ftmsbridge.recording.RecordingService
+import dev.frakw.ftmsbridge.retention.TrainingRetentionManager
 
 internal interface BridgeEnvironment {
     fun isMonitoringEnabled(): Boolean
@@ -82,6 +83,7 @@ internal class AndroidBridgeEnvironment(
 
     override fun enqueueHealthSync() {
         WorkManager.getInstance(context).enqueue(OneTimeWorkRequestBuilder<HealthSyncWorker>().build())
+        TrainingRetentionManager.schedule(context)
     }
 
     companion object {

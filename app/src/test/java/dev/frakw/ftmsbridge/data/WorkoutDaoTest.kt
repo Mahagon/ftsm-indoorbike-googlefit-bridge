@@ -59,6 +59,23 @@ class WorkoutDaoTest {
     }
 
     @Test
+    fun `deleting a completed workout cascades to its samples`() = runTest {
+        dao.upsertWorkout(
+            WorkoutEntity(
+                id = "old-ride",
+                startedAtMillis = 1_000,
+                endedAtMillis = 2_000,
+                state = WorkoutEntity.STATE_COMPLETE,
+                synced = true,
+            ),
+        )
+        dao.upsertSample(SampleEntity("old-ride", 1_500, 20.0, 80.0, 150, 10))
+
+        assertEquals(1, dao.deleteCompletedWorkout("old-ride"))
+        assertEquals(null, dao.workout("old-ride"))
+    }
+
+    @Test
     fun `migration from version one preserves workouts and samples`() = runTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val name = "workout-migration-${System.nanoTime()}.db"

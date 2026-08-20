@@ -425,6 +425,15 @@ class BridgeControllerTest {
             workouts.values.filter { it.state == WorkoutEntity.STATE_COMPLETE }.sortedByDescending { it.startedAtMillis }.take(limit),
         )
 
+        override suspend fun completedWorkoutsForRetention() = workouts.values.filter { it.state == WorkoutEntity.STATE_COMPLETE }.sortedBy { it.startedAtMillis }
+
+        override suspend fun deleteCompletedWorkout(id: String): Int {
+            val removed = workouts[id]?.takeIf { it.state == WorkoutEntity.STATE_COMPLETE } ?: return 0
+            workouts.remove(removed.id)
+            samples.entries.removeAll { it.value.workoutId == removed.id }
+            return 1
+        }
+
         override fun observeCompletedWorkout(id: String) = flowOf(
             workouts[id]
                 ?.takeIf { it.state == WorkoutEntity.STATE_COMPLETE }
