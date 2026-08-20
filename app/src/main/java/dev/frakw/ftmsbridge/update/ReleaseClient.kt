@@ -2,6 +2,7 @@ package dev.frakw.ftmsbridge.update
 
 import org.json.JSONObject
 import java.net.HttpURLConnection
+import java.net.URI
 import java.net.URL
 
 data class ReleaseInfo(
@@ -24,6 +25,7 @@ class GithubReleaseClient : ReleaseClient {
     override fun latest(): ReleaseInfo = parseRelease(text(LATEST_RELEASE_URL))
 
     override fun text(url: String): String {
+        requireTrustedReleaseUrl(url)
         val connection = URL(url).openConnection() as HttpURLConnection
         return try {
             connection.connectTimeout = 15_000
@@ -59,16 +61,52 @@ internal fun parseRelease(json: String): ReleaseInfo {
     val apks = matching.filter { it.getString("name") == apkName }
     val checksums = matching.filter { it.getString("name") == checksumName }
     if (apks.size != 1 || checksums.size != 1) throw UpdateException("Release assets are missing or ambiguous")
+    val apkUrl = apks.single().getString("browser_download_url")
+    val checksumUrl = checksums.single().getString("browser_download_url")
+    requireTrustedReleaseAssetUrl(apkUrl)
+    requireTrustedReleaseAssetUrl(checksumUrl)
     return ReleaseInfo(
         tag = tag,
         versionCode = versionCode,
         title = value.optString("name").ifBlank { tag },
         notes = value.optString("body"),
         apkName = apkName,
-        apkUrl = apks.single().getString("browser_download_url"),
-        checksumUrl = checksums.single().getString("browser_download_url"),
+        apkUrl = apkUrl,
+        checksumUrl = checksumUrl,
     )
 }
+
+internal fun requireTrustedReleaseUrl(value: String) {
+    val uri = trustedHttpsUri(value)
+    if (uri.host !in TRUSTED_GITHUB_HOSTS) throw UpdateException("Update URL uses an untrusted host")
+}
+
+private fun requireTrustedReleaseAssetUrl(value: String) {
+    val uri = trustedHttpsUri(value)
+    if (uri.host != "github.com" || !uri.path.startsWith(RELEASE_ASSET_PATH)) {
+        throw UpdateException("Release asset URL is outside the project releases")
+    }
+}
+
+private fun trustedHttpsUri(value: String): URI {
+    val uri = try {
+        URI(value)
+    } catch (_: Exception) {
+        throw UpdateException("Update URL is malformed")
+    }
+    if (uri.scheme != "https" || uri.host == null || uri.userInfo != null || uri.fragment != null) {
+        throw UpdateException("Update URL must use trusted HTTPS")
+    }
+    return uri
+}
+
+private val TRUSTED_GITHUB_HOSTS = setOf(
+    "api.github.com",
+    "github.com",
+    "objects.githubusercontent.com",
+    "release-assets.githubusercontent.com",
+)
+private const val RELEASE_ASSET_PATH = "/Mahagon/ftsm-indoorbike-googlefit-bridge/releases/download/"
 
 internal fun versionCode(tag: String): Long {
     val match = Regex("^v(\\d+)\\.(\\d+)\\.(\\d+)$").matchEntire(tag)

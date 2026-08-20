@@ -128,7 +128,7 @@ Open **Diagnostics** to inspect the latest raw FTMS packet and discovered GATT c
 Development requires:
 
 - Android Studio with JDK 17.
-- Android SDK Platform 36 and Android SDK Build-Tools 36.0.0.
+- Android SDK Platform 37 and Android SDK Build-Tools 37.0.0.
 
 Clone the repository, open it in Android Studio, and allow Gradle sync to finish. Run the `app` configuration on an Android 14+ phone, or install a debug build from the command line:
 

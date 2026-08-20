@@ -67,14 +67,14 @@ class RecordingService : Service() {
             PendingIntent.getActivity(
                 this,
                 0,
-                Intent(this, MainActivity::class.java),
+                Intent().setClass(this, MainActivity::class.java).setPackage(packageName),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )
         val disable =
             PendingIntent.getService(
                 this,
                 1,
-                Intent(this, RecordingService::class.java).setAction(ACTION_DISABLE),
+                Intent().setClass(this, RecordingService::class.java).setPackage(packageName).setAction(ACTION_DISABLE),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )
         return Notification

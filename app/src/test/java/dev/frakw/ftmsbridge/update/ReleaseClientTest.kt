@@ -14,7 +14,10 @@ class ReleaseClientTest {
         assertEquals("v1.2.3", release.tag)
         assertEquals(1_002_003L, release.versionCode)
         assertEquals("ftms-bridge-v1.2.3.apk", release.apkName)
-        assertEquals("https://example.test/app.apk", release.apkUrl)
+        assertEquals(
+            "https://github.com/Mahagon/ftsm-indoorbike-googlefit-bridge/releases/download/v1.2.3/ftms-bridge-v1.2.3.apk",
+            release.apkUrl,
+        )
     }
 
     @Test
@@ -22,6 +25,9 @@ class ReleaseClientTest {
         assertThrows(UpdateException::class.java) { versionCode("1.2.3") }
         assertThrows(UpdateException::class.java) { versionCode("v1.1000.0") }
         assertThrows(UpdateException::class.java) { parseRelease(releaseJson().replace(".apk.sha256", ".txt")) }
+        assertThrows(UpdateException::class.java) { parseRelease(releaseJson().replace("https://github.com", "http://github.com")) }
+        assertThrows(UpdateException::class.java) { requireTrustedReleaseUrl("https://example.test/update") }
+        requireTrustedReleaseUrl("https://api.github.com/repos/Mahagon/ftsm-indoorbike-googlefit-bridge/releases/latest")
     }
 
     @Test
@@ -58,8 +64,8 @@ class ReleaseClientTest {
           "draft": false,
           "prerelease": false,
           "assets": [
-            {"name": "ftms-bridge-v1.2.3.apk", "browser_download_url": "https://example.test/app.apk"},
-            {"name": "ftms-bridge-v1.2.3.apk.sha256", "browser_download_url": "https://example.test/app.sha256"}
+            {"name": "ftms-bridge-v1.2.3.apk", "browser_download_url": "https://github.com/Mahagon/ftsm-indoorbike-googlefit-bridge/releases/download/v1.2.3/ftms-bridge-v1.2.3.apk"},
+            {"name": "ftms-bridge-v1.2.3.apk.sha256", "browser_download_url": "https://github.com/Mahagon/ftsm-indoorbike-googlefit-bridge/releases/download/v1.2.3/ftms-bridge-v1.2.3.apk.sha256"}
           ]
         }
     """.trimIndent()

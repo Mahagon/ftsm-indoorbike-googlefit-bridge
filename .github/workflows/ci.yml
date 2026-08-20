@@ -20,7 +20,7 @@ jobs:
           java-version: "17"
       - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
       - name: Install Android SDK
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+        run: sdkmanager "platforms;android-37" "build-tools;37.0.0"
       - uses: gradle/actions/setup-gradle@4733eaac7c1b0da527e4206b7671e0061de1ce37 # v6
       - name: Test release version policy
         run: python .github/scripts/release_version_test.py
@@ -36,30 +36,43 @@ jobs:
             build/reports/
           if-no-files-found: ignore
 
-  api-36-smoke-test:
+  api-37-smoke-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: "17"
       - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
       - uses: gradle/actions/setup-gradle@4733eaac7c1b0da527e4206b7671e0061de1ce37 # v6
-      - name: Run instrumentation tests on Android 36
+      - name: Run instrumentation tests on Android 37
         uses: ReactiveCircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808 # v2
         with:
-          api-level: 36
+          api-level: 37
           target: google_apis
           arch: x86_64
           # The Android SDK has no pixel_7a AVD profile; Pixel 7 is the closest supported device.
           profile: pixel_7
           disable-animations: true
-          script: ./gradlew connectedDebugAndroidTest --no-daemon
+          disable-linux-hw-accel: false
+          script: |
+            set +e
+            ./gradlew connectedDebugAndroidTest --no-daemon
+            status=$?
+            mkdir -p app/build/reports/androidTests/diagnostics
+            adb logcat -d > app/build/reports/androidTests/diagnostics/logcat.txt || true
+            adb shell getprop > app/build/reports/androidTests/diagnostics/device-properties.txt || true
+            exit $status
       - name: Upload instrumentation reports on failure
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: api-36-instrumentation-reports
+          name: api-37-instrumentation-reports
           path: app/build/reports/androidTests/
           if-no-files-found: ignore
