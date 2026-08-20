@@ -69,6 +69,7 @@ jobs:
           arch: x86_64
           # The Android SDK has no pixel_7a AVD profile; Pixel 7 is the closest supported device.
           profile: pixel_7
+          disk-size: 8G
           disable-animations: true
           disable-linux-hw-accel: false
           script: |
@@ -78,6 +79,7 @@ jobs:
             mkdir -p app/build/reports/androidTests/diagnostics
             adb logcat -d > app/build/reports/androidTests/diagnostics/logcat.txt || true
             adb shell getprop > app/build/reports/androidTests/diagnostics/device-properties.txt || true
+            adb shell df -h /data > app/build/reports/androidTests/diagnostics/data-filesystem.txt || true
             exit $status
       - name: Upload instrumentation reports on failure
         if: failure()
