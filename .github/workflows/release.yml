@@ -5,7 +5,9 @@ on:
     tags: ["v*.*.*"]
 
 permissions:
+  attestations: write
   contents: write
+  id-token: write
 
 jobs:
   release:
@@ -67,6 +69,10 @@ jobs:
           cp app/build/outputs/apk/release/app-release.apk "$apk"
           sha256sum "$apk" > "$apk.sha256"
           echo "RELEASE_APK=$apk" >> "$GITHUB_ENV"
+      - name: Attest release APK provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: ${{ env.RELEASE_APK }}
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
