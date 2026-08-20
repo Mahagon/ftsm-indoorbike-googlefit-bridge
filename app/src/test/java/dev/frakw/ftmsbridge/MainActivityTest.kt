@@ -18,4 +18,17 @@ class MainActivityTest {
             .filterNot { it == ConnectionState.READY || it == ConnectionState.RECORDING }
             .forEach { connection -> assertFalse(connection.name, shouldKeepScreenAwake(connection)) }
     }
+
+    @Test
+    fun `fullscreen is available while bike is ready or recording`() {
+        assertTrue(canShowFullscreen(ConnectionState.READY))
+        assertTrue(canShowFullscreen(ConnectionState.RECORDING))
+    }
+
+    @Test
+    fun `fullscreen is unavailable without live bike data`() {
+        ConnectionState.entries
+            .filterNot { it == ConnectionState.READY || it == ConnectionState.RECORDING }
+            .forEach { connection -> assertFalse(connection.name, canShowFullscreen(connection)) }
+    }
 }

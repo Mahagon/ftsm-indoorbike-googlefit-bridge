@@ -11,6 +11,20 @@ data class IndoorBikeSample(
     val elapsedTimeSeconds: Int?,
 )
 
+sealed interface WorkoutTarget {
+    data class Duration(val seconds: Long) : WorkoutTarget {
+        init {
+            require(seconds > 0)
+        }
+    }
+
+    data class Distance(val meters: Double) : WorkoutTarget {
+        init {
+            require(meters.isFinite() && meters > 0)
+        }
+    }
+}
+
 data class DiscoveredBike(
     val name: String,
     val address: String,
@@ -31,5 +45,5 @@ data class BridgeState(
     val rawPacket: String? = null,
     val diagnostics: List<String> = emptyList(),
     val monitoringEnabled: Boolean = false,
-    val reconnectDeadline: Instant? = null,
+    val target: WorkoutTarget? = null,
 )

@@ -1,28 +1,31 @@
 name: Release APK
 
 on:
+  workflow_dispatch:
   push:
     tags: ["v*.*.*"]
 
 permissions:
+  attestations: write
   contents: write
+  id-token: write
 
 jobs:
   release:
     runs-on: ubuntu-latest
     environment: release
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: "17"
-      - uses: android-actions/setup-android@v4
+      - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
       - name: Install Android SDK
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@4733eaac7c1b0da527e4206b7671e0061de1ce37 # v6
       - name: Derive Android version from tag
         shell: bash
         run: |
@@ -67,6 +70,10 @@ jobs:
           cp app/build/outputs/apk/release/app-release.apk "$apk"
           sha256sum "$apk" > "$apk.sha256"
           echo "RELEASE_APK=$apk" >> "$GITHUB_ENV"
+      - name: Attest release APK provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: ${{ env.RELEASE_APK }}
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}

@@ -5,6 +5,7 @@ import dev.frakw.ftmsbridge.data.WorkoutDao
 import dev.frakw.ftmsbridge.data.WorkoutEntity
 import dev.frakw.ftmsbridge.data.WorkoutWithSamples
 import dev.frakw.ftmsbridge.model.IndoorBikeSample
+import dev.frakw.ftmsbridge.model.WorkoutTarget
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -13,6 +14,20 @@ import org.junit.Test
 import java.time.Instant
 
 class WorkoutRecorderTest {
+    @Test
+    fun `start persists selected target`() = runTest {
+        val dao = FakeDao()
+        val recorder = WorkoutRecorder(dao)
+        val duration = recorder.start(Instant.EPOCH, WorkoutTarget.Duration(1_200))
+        assertEquals(1_200L, duration.targetDurationSeconds)
+        assertEquals(null, duration.targetDistanceMeters)
+
+        recorder.stop(Instant.EPOCH.plusSeconds(1))
+        val distance = recorder.start(Instant.EPOCH.plusSeconds(2), WorkoutTarget.Distance(5_500.0))
+        assertEquals(5_500.0, distance.targetDistanceMeters ?: 0.0, 0.0)
+        assertEquals(null, distance.targetDurationSeconds)
+    }
+
     @Test
     fun integratesSpeedWhenBikeDistanceIsMissing() = runTest {
         val dao = FakeDao()

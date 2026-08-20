@@ -2,13 +2,16 @@
 
 FTMS Bike Bridge is an Android app that records workouts from an FTMS-compatible indoor bike over Bluetooth Low Energy. Workouts are saved in the app, exported to Android Health Connect, and can then appear in Google Fit.
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) to contribute and [SECURITY.md](SECURITY.md) to report a vulnerability privately.
+
 ## Features
 
 - Records duration, distance, speed, cycling cadence, and power.
 - Keeps a local, paginated workout history with summary statistics and Health Connect sync status.
+- Supports one-session duration or distance targets with live progress.
 - Supports manual recording or automatic background monitoring and recording.
 - Restores background monitoring after a phone restart.
-- Continues recording with the screen off and tolerates a bike disconnect for up to five minutes.
+- Continues recording with the screen off, reconnects to the remembered bike, and finishes inactive rides automatically.
 - Writes completed stationary-cycling sessions and available metric samples to Health Connect.
 - Follows the phone's light or dark appearance setting.
 - Checks GitHub Releases for signed updates and verifies downloaded APKs before installation.
@@ -43,6 +46,14 @@ The selected bike is remembered for future reconnections.
 
 ## Record workouts
 
+### Set a session target
+
+Before a workout starts, use **Session target** to select either **Duration** or **Distance**. Enter positive whole minutes or a kilometer value such as `12.5`, then tap **Set target**.
+
+The target applies to the next workout only, including a workout started automatically by background monitoring. Once that workout starts, the pending target is cleared. Use **Clear** before starting if you no longer want it.
+
+During the workout, the targeted duration or distance card fills from left to right while continuing to show the current value. At 100% it displays **Target reached** and remains full; recording continues until you finish the workout.
+
 ### Manual recording
 
 1. Connect the bike and wait for **Ready**.
@@ -55,7 +66,7 @@ The workout is saved locally before a background task exports it to Health Conne
 
 Enable **Background monitoring** to let the app reconnect to the remembered bike and begin recording automatically when bike measurements arrive. Monitoring runs through a foreground notification and resumes after the phone restarts.
 
-If the bike disconnects during a workout, the app waits up to five minutes for it to reconnect. If it does not return, the workout is finalized at the time of the last measurement. Use **Finish now** to end an automatically started workout immediately.
+While monitoring is enabled, the foreground service retries a direct connection to the remembered bike every ten seconds until it is ready. A workout is finalized and queued for Health Connect sync immediately if the bike disconnects, or after speed, cadence, power, and distance remain unchanged for 30 seconds. Timestamp and elapsed-time updates alone do not keep a workout active. Use **Finish now** to end an automatically started workout immediately.
 
 ## Workout history
 
@@ -68,6 +79,8 @@ Each entry shows its date, duration, distance, and Health Connect state:
 - **Failed:** export failed; open the workout to see the error and tap **Retry sync**.
 
 Workout details include average and maximum speed, cadence, and power when the bike supplied those measurements.
+
+If the workout had a target, its details also show the planned value and whether it was reached.
 
 Workouts recorded by affected older releases may show that detailed metrics are unavailable. Those releases deleted their local sample rows while updating the workout, so the missing historical samples cannot be reconstructed. Workouts recorded after the fix retain their samples.
 
@@ -163,12 +176,7 @@ keytool -genkeypair -v -keystore ftms-bridge-release.jks -alias ftms-bridge -key
 
 Store the Base64 value and matching credentials in the release environment. Keep the original keystore and passwords in a secure backup: losing the key prevents future APKs from updating existing installations.
 
-After CI succeeds, publish a new semantic version by pushing its tag, for example:
-
-```shell
-git tag v0.2.0
-git push origin v0.2.0
-```
+Human pull-request branches use the next semantic version without a `v` prefix, such as `0.2.0`. The version check requires that branch version to be greater than the latest release. After the pull request is merged into `main`, automation creates the matching `v0.2.0` tag and starts this release workflow. Dependabot pull requests are exempt and do not create releases.
 
 ## Protocol and license
 

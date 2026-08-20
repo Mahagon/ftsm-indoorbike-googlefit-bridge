@@ -57,4 +57,57 @@ class WorkoutDaoTest {
         assertEquals(2, records.filterIsInstance<CyclingPedalingCadenceRecord>().single().samples.size)
         assertEquals(2, records.filterIsInstance<PowerRecord>().single().samples.size)
     }
+
+    @Test
+    fun `migration from version one preserves workouts and samples`() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val name = "workout-migration-${System.nanoTime()}.db"
+        context.openOrCreateDatabase(name, Context.MODE_PRIVATE, null).use { sqlite ->
+            sqlite.execSQL(
+                """
+                CREATE TABLE workouts (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    startedAtMillis INTEGER NOT NULL,
+                    endedAtMillis INTEGER,
+                    distanceMeters REAL NOT NULL,
+                    state TEXT NOT NULL,
+                    synced INTEGER NOT NULL,
+                    syncError TEXT
+                )
+                """.trimIndent(),
+            )
+            sqlite.execSQL(
+                """
+                CREATE TABLE samples (
+                    workoutId TEXT NOT NULL,
+                    timestampMillis INTEGER NOT NULL,
+                    speedKph REAL,
+                    cadenceRpm REAL,
+                    powerWatts INTEGER,
+                    bikeDistanceMeters INTEGER,
+                    PRIMARY KEY (workoutId, timestampMillis),
+                    FOREIGN KEY (workoutId) REFERENCES workouts(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            sqlite.execSQL("CREATE INDEX index_samples_workoutId ON samples(workoutId)")
+            sqlite.execSQL("INSERT INTO workouts VALUES ('old-ride', 1000, 4000, 25.0, 'COMPLETE', 1, NULL)")
+            sqlite.execSQL("INSERT INTO samples VALUES ('old-ride', 2000, 20.0, 80.0, 150, 10)")
+            sqlite.version = 1
+        }
+
+        val migrated = Room.databaseBuilder(context, BridgeDatabase::class.java, name)
+            .addMigrations(BridgeDatabase.MIGRATION_1_2)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val stored = requireNotNull(migrated.workouts().workout("old-ride"))
+            assertEquals(1, stored.samples.size)
+            assertEquals(null, stored.workout.targetDurationSeconds)
+            assertEquals(null, stored.workout.targetDistanceMeters)
+        } finally {
+            migrated.close()
+            context.deleteDatabase(name)
+        }
+    }
 }

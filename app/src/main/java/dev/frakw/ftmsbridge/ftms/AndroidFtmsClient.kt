@@ -35,7 +35,6 @@ class AndroidFtmsClient(
     private val mutableState = MutableStateFlow(FtmsClientState())
     override val state: StateFlow<FtmsClientState> = mutableState.asStateFlow()
     private var gatt: BluetoothGatt? = null
-    private var autoConnect = false
     private val sampleAccumulator = FtmsSampleAccumulator()
 
     private val scanCallback =
@@ -72,6 +71,9 @@ class AndroidFtmsClient(
                 }
                 when {
                     status != BluetoothGatt.GATT_SUCCESS -> {
+                        sampleAccumulator.reset()
+                        gatt.close()
+                        if (this@AndroidFtmsClient.gatt === gatt) this@AndroidFtmsClient.gatt = null
                         fail("Bike disconnected (GATT $status)")
                     }
 
@@ -84,10 +86,8 @@ class AndroidFtmsClient(
                     newState == BluetoothProfile.STATE_DISCONNECTED -> {
                         sampleAccumulator.reset()
                         mutableState.update { it.copy(connection = ConnectionState.DISCONNECTED, latest = null) }
-                        if (!autoConnect) {
-                            gatt.close()
-                            if (this@AndroidFtmsClient.gatt === gatt) this@AndroidFtmsClient.gatt = null
-                        }
+                        gatt.close()
+                        if (this@AndroidFtmsClient.gatt === gatt) this@AndroidFtmsClient.gatt = null
                     }
                 }
             }
@@ -181,11 +181,9 @@ class AndroidFtmsClient(
         }
     }
 
-    override fun connect(
-        address: String,
-        autoConnect: Boolean,
-    ) {
+    override fun connect(address: String) {
         stopScan()
+        if (adapter?.isEnabled != true) return fail("Bluetooth is turned off")
         val device = adapter?.getRemoteDevice(address) ?: return fail("Bike address is invalid")
         mutableState.update {
             it.copy(
@@ -198,9 +196,8 @@ class AndroidFtmsClient(
             )
         }
         sampleAccumulator.reset()
-        this.autoConnect = autoConnect
         gatt?.close()
-        gatt = device.connectGatt(appContext, autoConnect, callback, BluetoothDevice.TRANSPORT_LE)
+        gatt = device.connectGatt(appContext, false, callback, BluetoothDevice.TRANSPORT_LE)
     }
 
     override fun disconnect() {
@@ -208,7 +205,6 @@ class AndroidFtmsClient(
         gatt?.disconnect()
         gatt?.close()
         gatt = null
-        autoConnect = false
         sampleAccumulator.reset()
         mutableState.update { it.copy(connection = ConnectionState.DISCONNECTED, latest = null) }
     }
