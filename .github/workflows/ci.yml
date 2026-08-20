@@ -63,6 +63,9 @@ jobs:
             echo "Pixel 9 hardware profile is unavailable" >&2
             exit 1
           }
+          echo no | avdmanager create avd --force --name test \
+            --package "system-images;android-37.0;google_apis_ps16k;x86_64" \
+            --device pixel_9
       - uses: gradle/actions/setup-gradle@4733eaac7c1b0da527e4206b7671e0061de1ce37 # v6
       - name: Run instrumentation tests on Android 37
         uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
@@ -73,6 +76,7 @@ jobs:
           arch: x86_64
           profile: pixel_9
           disk-size: 8G
+          force-avd-creation: false
           disable-animations: true
           disable-linux-hw-accel: false
           emulator-options: -no-window -gpu software -no-snapshot -noaudio -no-boot-anim
