@@ -21,7 +21,7 @@ jobs:
         with:
           packages: platform-tools
       - name: Install Android SDK
-        run: sdkmanager --channel=3 "platforms;android-37" "build-tools;37.0.0"
+        run: sdkmanager --channel=3 "platforms;android-37.0" "build-tools;37.0.0"
       - name: Generate and submit dependency graph
         uses: gradle/actions/dependency-submission@4733eaac7c1b0da527e4206b7671e0061de1ce37 # v6
         with:
