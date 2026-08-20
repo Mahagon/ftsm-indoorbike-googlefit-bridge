@@ -500,7 +500,7 @@ private fun Metric(label: String, value: String) {
 
 private fun stateLabel(state: BridgeState): String = when (state.connection) {
     ConnectionState.DISCONNECTED ->
-        if (state.reconnectDeadline != null) "Bike disconnected · waiting up to 5 minutes" else "Not connected"
+        "Not connected"
 
     ConnectionState.SCANNING -> "Scanning…"
 

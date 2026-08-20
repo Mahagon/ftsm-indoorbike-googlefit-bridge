@@ -112,7 +112,7 @@ class BridgeControllerTest {
     }
 
     @Test
-    fun `disconnect finalizes after grace period`() = runTest {
+    fun `disconnect finalizes and syncs immediately`() = runTest {
         val fixture = fixture(monitoringEnabled = true)
         runCurrent()
         fixture.client.emit(ready(sample(BASE_TIME)))
@@ -120,37 +120,26 @@ class BridgeControllerTest {
 
         fixture.client.emit(FtmsClientState(connection = ConnectionState.DISCONNECTED))
         runCurrent()
-        assertEquals(BASE_TIME.plusSeconds(1), fixture.controller.state.value.reconnectDeadline)
-
-        advanceTimeBy(999)
-        runCurrent()
-        assertNotNull(fixture.controller.state.value.recordingId)
-
-        advanceTimeBy(1)
-        runCurrent()
         assertNull(fixture.controller.state.value.recordingId)
-        assertNull(fixture.controller.state.value.reconnectDeadline)
         assertEquals(1, fixture.environment.healthSyncRequests)
     }
 
     @Test
-    fun `reconnect cancels pending finalization`() = runTest {
-        val fixture = fixture(monitoringEnabled = true)
+    fun `normal disconnect retries saved bike after delay`() = runTest {
+        val fixture = fixture(monitoringEnabled = true, lastBikeAddress = "bike-address")
         runCurrent()
         fixture.client.emit(ready(sample(BASE_TIME)))
         runCurrent()
         fixture.client.emit(FtmsClientState(connection = ConnectionState.DISCONNECTED))
         runCurrent()
 
-        advanceTimeBy(500)
-        fixture.client.emit(ready(sample(BASE_TIME.plusMillis(500))))
+        advanceTimeBy(999)
         runCurrent()
-        advanceTimeBy(1_000)
-        runCurrent()
+        assertTrue(fixture.client.connections.isEmpty())
 
-        assertNotNull(fixture.controller.state.value.recordingId)
-        assertNull(fixture.controller.state.value.reconnectDeadline)
-        assertEquals(0, fixture.environment.healthSyncRequests)
+        advanceTimeBy(1)
+        runCurrent()
+        assertEquals(listOf("bike-address"), fixture.client.connections)
     }
 
     @Test
@@ -167,7 +156,7 @@ class BridgeControllerTest {
 
         advanceTimeBy(1)
         runCurrent()
-        assertEquals(listOf("bike-address" to true), fixture.client.connections)
+        assertEquals(listOf("bike-address"), fixture.client.connections)
     }
 
     @Test
@@ -204,7 +193,82 @@ class BridgeControllerTest {
     }
 
     @Test
-    fun `active workout is restored on initialization`() = runTest {
+    fun `unchanged movement finalizes after inactivity timeout`() = runTest {
+        val fixture = fixture(monitoringEnabled = true)
+        runCurrent()
+        fixture.client.emit(ready(sample(BASE_TIME)))
+        runCurrent()
+
+        advanceTimeBy(999)
+        runCurrent()
+        assertNotNull(fixture.controller.state.value.recordingId)
+
+        advanceTimeBy(1)
+        runCurrent()
+        assertNull(fixture.controller.state.value.recordingId)
+        assertEquals(1, fixture.environment.healthSyncRequests)
+        assertEquals(BASE_TIME.plusMillis(1).toEpochMilli(), fixture.dao.workouts.values.single().endedAtMillis)
+    }
+
+    @Test
+    fun `movement changes reset inactivity timeout`() = runTest {
+        val fixture = fixture(monitoringEnabled = true)
+        runCurrent()
+        fixture.client.emit(ready(sample(BASE_TIME)))
+        runCurrent()
+
+        advanceTimeBy(500)
+        fixture.client.emit(ready(sample(BASE_TIME.plusMillis(500), powerWatts = 151)))
+        runCurrent()
+        advanceTimeBy(999)
+        runCurrent()
+        assertNotNull(fixture.controller.state.value.recordingId)
+
+        advanceTimeBy(1)
+        runCurrent()
+        assertNull(fixture.controller.state.value.recordingId)
+        assertEquals(BASE_TIME.plusMillis(500).toEpochMilli(), fixture.dao.workouts.values.single().endedAtMillis)
+    }
+
+    @Test
+    fun `elapsed time alone does not reset inactivity timeout`() = runTest {
+        val fixture = fixture(monitoringEnabled = true)
+        runCurrent()
+        fixture.client.emit(ready(sample(BASE_TIME, elapsedTimeSeconds = 1)))
+        runCurrent()
+
+        advanceTimeBy(500)
+        fixture.client.emit(ready(sample(BASE_TIME.plusMillis(500), elapsedTimeSeconds = 2)))
+        runCurrent()
+        advanceTimeBy(500)
+        runCurrent()
+
+        assertNull(fixture.controller.state.value.recordingId)
+        assertEquals(1, fixture.environment.healthSyncRequests)
+    }
+
+    @Test
+    fun `stationary packets stay suppressed until movement changes`() = runTest {
+        val fixture = fixture(monitoringEnabled = true)
+        runCurrent()
+        fixture.client.emit(ready(sample(BASE_TIME)))
+        runCurrent()
+        advanceTimeBy(1_000)
+        runCurrent()
+
+        fixture.client.emit(ready(sample(BASE_TIME.plusSeconds(1))))
+        runCurrent()
+        assertNull(fixture.controller.state.value.recordingId)
+        assertEquals(1, fixture.dao.workouts.size)
+
+        fixture.client.emit(ready(sample(BASE_TIME.plusSeconds(2), powerWatts = 151)))
+        runCurrent()
+        assertNotNull(fixture.controller.state.value.recordingId)
+        assertEquals(2, fixture.dao.workouts.size)
+    }
+
+    @Test
+    fun `disconnected restored workout is finalized on initialization`() = runTest {
         val dao = FakeDao()
         dao.upsertWorkout(
             WorkoutEntity(
@@ -218,11 +282,10 @@ class BridgeControllerTest {
         val fixture = fixture(dao = dao)
         runCurrent()
 
-        assertEquals("restored", fixture.controller.state.value.recordingId)
-        assertEquals(BASE_TIME, fixture.controller.state.value.startedAt)
-        assertEquals(42.0, fixture.controller.state.value.distanceMeters, 0.0)
-        assertEquals(WorkoutTarget.Distance(10_000.0), fixture.controller.state.value.target)
-        assertNotNull(fixture.controller.state.value.reconnectDeadline)
+        assertNull(fixture.controller.state.value.recordingId)
+        assertEquals(WorkoutEntity.STATE_COMPLETE, dao.workouts.getValue("restored").state)
+        assertEquals(BASE_TIME.plusMillis(1).toEpochMilli(), dao.workouts.getValue("restored").endedAtMillis)
+        assertEquals(1, fixture.environment.healthSyncRequests)
     }
 
     private fun kotlinx.coroutines.test.TestScope.fixture(
@@ -240,7 +303,7 @@ class BridgeControllerTest {
                 environment = environment,
                 scope = backgroundScope,
                 clock = SchedulerClock(testScheduler, BASE_TIME),
-                disconnectGraceMillis = 1_000,
+                inactivityMillis = 1_000,
                 retryMillis = 1_000,
             )
         return Fixture(controller, client, environment, dao)
@@ -251,7 +314,11 @@ class BridgeControllerTest {
         latest = sample,
     )
 
-    private fun sample(at: Instant) = IndoorBikeSample(at, 25.0, 80.0, 150, null, null)
+    private fun sample(
+        at: Instant,
+        powerWatts: Int = 150,
+        elapsedTimeSeconds: Int? = null,
+    ) = IndoorBikeSample(at, 25.0, 80.0, powerWatts, null, elapsedTimeSeconds)
 
     private data class Fixture(
         val controller: BridgeController,
@@ -263,7 +330,7 @@ class BridgeControllerTest {
     private class FakeFtmsClient : FtmsClient {
         private val mutableState = MutableStateFlow(FtmsClientState())
         override val state: StateFlow<FtmsClientState> = mutableState
-        val connections = mutableListOf<Pair<String, Boolean>>()
+        val connections = mutableListOf<String>()
 
         fun emit(value: FtmsClientState) {
             mutableState.value = value
@@ -273,11 +340,8 @@ class BridgeControllerTest {
 
         override fun stopScan() = Unit
 
-        override fun connect(
-            address: String,
-            autoConnect: Boolean,
-        ) {
-            connections += address to autoConnect
+        override fun connect(address: String) {
+            connections += address
         }
 
         override fun disconnect() {

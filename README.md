@@ -9,7 +9,7 @@ FTMS Bike Bridge is an Android app that records workouts from an FTMS-compatible
 - Supports one-session duration or distance targets with live progress.
 - Supports manual recording or automatic background monitoring and recording.
 - Restores background monitoring after a phone restart.
-- Continues recording with the screen off and tolerates a bike disconnect for up to five minutes.
+- Continues recording with the screen off, reconnects to the remembered bike, and finishes inactive rides automatically.
 - Writes completed stationary-cycling sessions and available metric samples to Health Connect.
 - Follows the phone's light or dark appearance setting.
 - Checks GitHub Releases for signed updates and verifies downloaded APKs before installation.
@@ -64,7 +64,7 @@ The workout is saved locally before a background task exports it to Health Conne
 
 Enable **Background monitoring** to let the app reconnect to the remembered bike and begin recording automatically when bike measurements arrive. Monitoring runs through a foreground notification and resumes after the phone restarts.
 
-If the bike disconnects during a workout, the app waits up to five minutes for it to reconnect. If it does not return, the workout is finalized at the time of the last measurement. Use **Finish now** to end an automatically started workout immediately.
+While monitoring is enabled, the foreground service retries a direct connection to the remembered bike every ten seconds until it is ready. A workout is finalized and queued for Health Connect sync immediately if the bike disconnects, or after speed, cadence, power, and distance remain unchanged for 30 seconds. Timestamp and elapsed-time updates alone do not keep a workout active. Use **Finish now** to end an automatically started workout immediately.
 
 ## Workout history
 

@@ -45,6 +45,5 @@ data class BridgeState(
     val rawPacket: String? = null,
     val diagnostics: List<String> = emptyList(),
     val monitoringEnabled: Boolean = false,
-    val reconnectDeadline: Instant? = null,
     val target: WorkoutTarget? = null,
 )

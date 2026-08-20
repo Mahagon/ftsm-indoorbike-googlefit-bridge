@@ -89,7 +89,6 @@ class RecordingService : Service() {
     }
 
     private fun notificationText(state: BridgeState): String = when {
-        state.recordingId != null && state.reconnectDeadline != null -> "Bike disconnected · waiting up to 5 minutes"
         state.recordingId != null -> "Recording ${state.bike?.name.orEmpty()}"
         state.connection == ConnectionState.READY -> "Connected · waiting for ride data"
         state.connection == ConnectionState.CONNECTING -> "Waiting for ${state.bike?.name ?: "bike"}"
