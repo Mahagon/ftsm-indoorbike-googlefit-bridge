@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothGattConnectionSettings
 import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothProfile
 import android.bluetooth.le.BluetoothLeScanner
@@ -13,6 +14,7 @@ import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
+import android.os.Build
 import android.os.ParcelUuid
 import dev.frakw.ftmsbridge.model.ConnectionState
 import dev.frakw.ftmsbridge.model.DiscoveredBike
@@ -197,7 +199,19 @@ class AndroidFtmsClient(
         }
         sampleAccumulator.reset()
         gatt?.close()
-        gatt = device.connectGatt(appContext, false, callback, BluetoothDevice.TRANSPORT_LE)
+        gatt = connectGatt(device)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun connectGatt(device: BluetoothDevice): BluetoothGatt? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.CINNAMON_BUN) {
+        val settings =
+            BluetoothGattConnectionSettings.Builder()
+                .setAutoConnectEnabled(false)
+                .setTransport(BluetoothDevice.TRANSPORT_LE)
+                .build()
+        device.connectGatt(settings, appContext.mainExecutor, callback)
+    } else {
+        device.connectGatt(appContext, false, callback, BluetoothDevice.TRANSPORT_LE)
     }
 
     override fun disconnect() {
