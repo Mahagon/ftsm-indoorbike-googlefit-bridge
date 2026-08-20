@@ -143,6 +143,9 @@
             <trusting group="org.junit"/>
          </trusted-key>
       </trusted-keys>
+      <ignored-keys>
+         <ignored-key id="5F7786DF73E61F56" reason="Public key is not published; verify the pinned marker POM checksum instead"/>
+      </ignored-keys>
    </configuration>
    <components>
       <component group="androidx.annotation" name="annotation" version="1.7.0">
@@ -450,6 +453,7 @@
       </component>
       <component group="org.jetbrains.kotlin.plugin.compose" name="org.jetbrains.kotlin.plugin.compose.gradle.plugin" version="2.4.10">
          <artifact name="org.jetbrains.kotlin.plugin.compose.gradle.plugin-2.4.10.pom">
+            <sha256 value="0c101ab316081659050fe9c0144b1b4bf725ebf9aa9943113bc221e923473d04" origin="Gradle Plugin Portal" reason="Artifact is not signed by this repository"/>
             <sha256 value="a34cd5d78df696fd0f9c29a37c2ff700df7c2095117afdfe0c47c41b215a2f4c" origin="Maven Central" reason="Artifact is not signed"/>
          </artifact>
       </component>
