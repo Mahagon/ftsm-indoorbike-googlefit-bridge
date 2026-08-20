@@ -12,7 +12,10 @@ class HealthSyncWorker(
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val app = applicationContext as BridgeApplication
-        if (!app.healthWriter.hasPermissions()) return Result.failure()
+        if (!app.healthWriter.hasPermissions()) {
+            app.retention.enforce()
+            return Result.failure()
+        }
         var retry = false
         app.database.workouts().pendingSync().forEach { workout ->
             val value = app.database.workouts().workout(workout.id) ?: return@forEach
@@ -26,6 +29,7 @@ class HealthSyncWorker(
                 retry = true
             }
         }
+        app.retention.enforce()
         return if (retry) Result.retry() else Result.success()
     }
 }

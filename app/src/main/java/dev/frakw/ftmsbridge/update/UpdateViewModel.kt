@@ -185,10 +185,12 @@ class UpdateViewModel(
             val file = targetFile(saved.release.apkName)
             if (!file.isFile) throw UpdateException("Downloaded APK was not found")
             if (!sha256(file).equals(saved.checksum, ignoreCase = true)) throw UpdateException("Downloaded APK checksum does not match")
-            val packageInfo = getApplication<Application>().packageManager.getPackageArchiveInfo(file.path, 0)
+            val application = getApplication<Application>()
+            val packageInfo = application.packageManager.getPackageArchiveInfo(file.path, 0)
                 ?: throw UpdateException("Downloaded file is not a valid APK")
             if (packageInfo.packageName != BuildConfig.APPLICATION_ID) throw UpdateException("Downloaded APK has the wrong package ID")
             if (packageInfo.longVersionCode <= BuildConfig.VERSION_CODE) throw UpdateException("Downloaded APK is not a newer version")
+            ApkSignatureVerifier(application.packageManager, BuildConfig.APPLICATION_ID).verify(file)
             mutableState.value = UpdateUiState(UpdateStatus.READY, saved.release, progress = 100)
             notifyReady(saved.release)
         } catch (error: Exception) {
@@ -215,7 +217,7 @@ class UpdateViewModel(
         val open = PendingIntent.getActivity(
             application,
             0,
-            Intent(application, MainActivity::class.java),
+            Intent().setClass(application, MainActivity::class.java).setPackage(application.packageName),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         manager.notify(

@@ -10,7 +10,7 @@ Do not report vulnerabilities publicly. Follow the confidential process in [SECU
 
 ## Development setup
 
-Development requires Android Studio, JDK 17, Android SDK Platform 36, and Android SDK Build-Tools 36.0.0. Clone the repository, open it in Android Studio, and allow Gradle sync to finish.
+Development requires Android Studio, JDK 17, Android SDK Platform 37, and Android SDK Build-Tools 37.0.0. Clone the repository, open it in Android Studio, and allow Gradle sync to finish.
 
 Build or install a debug version with:
 

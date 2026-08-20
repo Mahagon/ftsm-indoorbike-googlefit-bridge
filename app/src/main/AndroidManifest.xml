@@ -17,10 +17,12 @@
 
     <application
         android:name=".BridgeApplication"
+        android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="false"
         android:icon="@drawable/ic_launcher"
         android:label="FTMS Bike Bridge"
+        android:usesCleartextTraffic="false"
         android:theme="@style/Theme.FtmsBridge">
         <activity
             android:name=".MainActivity"

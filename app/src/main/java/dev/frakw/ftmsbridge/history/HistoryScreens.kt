@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.frakw.ftmsbridge.data.WorkoutEntity
@@ -165,14 +166,15 @@ private fun ScreenHeader(title: String, onBack: () -> Unit) {
 
 @Composable
 private fun MetricCard(label: String, summary: MetricSummary?, unit: String) {
+    val locale = Locale.forLanguageTag(LocalLocale.current.toLanguageTag())
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(label, style = MaterialTheme.typography.titleMedium)
             if (summary == null) {
                 Text("No data")
             } else {
-                DetailRow("Average", String.format(Locale.getDefault(), "%.1f %s", summary.average, unit))
-                DetailRow("Maximum", String.format(Locale.getDefault(), "%.1f %s", summary.maximum, unit))
+                DetailRow("Average", String.format(locale, "%.1f %s", summary.average, unit))
+                DetailRow("Maximum", String.format(locale, "%.1f %s", summary.maximum, unit))
             }
         }
     }

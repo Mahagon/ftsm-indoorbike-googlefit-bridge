@@ -2,8 +2,6 @@ name: CodeQL
 
 on:
   pull_request:
-  push:
-    branches: [main]
   schedule:
     - cron: "23 4 * * 1"
   workflow_dispatch:
@@ -35,9 +33,11 @@ jobs:
           java-version: "17"
       - if: matrix.language == 'java-kotlin'
         uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
+        with:
+          packages: platform-tools
       - if: matrix.language == 'java-kotlin'
         name: Install Android SDK
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+        run: sdkmanager --channel=3 "platforms;android-37.0" "build-tools;37.0.0"
       - if: matrix.language == 'java-kotlin'
         uses: gradle/actions/setup-gradle@4733eaac7c1b0da527e4206b7671e0061de1ce37 # v6
       - uses: github/codeql-action/init@988661ebb5e81487b3fb31b2185d2856c0a10679 # v4
