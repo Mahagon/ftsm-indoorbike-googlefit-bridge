@@ -3,6 +3,10 @@
    <configuration>
       <verify-metadata>true</verify-metadata>
       <verify-signatures>true</verify-signatures>
+      <key-servers>
+         <key-server uri="https://keyserver.ubuntu.com"/>
+         <key-server uri="https://keys.openpgp.org"/>
+      </key-servers>
       <trusted-keys>
          <trusted-key id="7B79ADD11F8A779FE90FD3D0893A028475557671">
             <trusting group="com.gradle"/>
@@ -143,9 +147,6 @@
             <trusting group="org.junit"/>
          </trusted-key>
       </trusted-keys>
-      <ignored-keys>
-         <ignored-key id="5F7786DF73E61F56" reason="Public key is not published; verify the pinned marker POM checksum instead"/>
-      </ignored-keys>
    </configuration>
    <components>
       <component group="androidx.annotation" name="annotation" version="1.7.0">
