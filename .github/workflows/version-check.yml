@@ -1,0 +1,27 @@
+name: Version
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dependabot exemption
+        if: github.event.pull_request.user.login == 'dependabot[bot]'
+        run: echo "Dependabot pull requests do not create releases."
+      - name: Check out repository and tags
+        if: github.event.pull_request.user.login != 'dependabot[bot]'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - name: Validate release branch
+        if: github.event.pull_request.user.login != 'dependabot[bot]'
+        env:
+          RELEASE_BRANCH: ${{ github.head_ref }}
+        run: python .github/scripts/release_version.py "$RELEASE_BRANCH"

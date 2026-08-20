@@ -22,6 +22,8 @@ jobs:
       - name: Install Android SDK
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
       - uses: gradle/actions/setup-gradle@4733eaac7c1b0da527e4206b7671e0061de1ce37 # v6
+      - name: Test release version policy
+        run: python .github/scripts/release_version_test.py
       - name: Check formatting, tests, and Android lint
         run: ./gradlew spotlessCheck testDebugUnitTest lintDebug --no-daemon
       - name: Upload reports on failure
