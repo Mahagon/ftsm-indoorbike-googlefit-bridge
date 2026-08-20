@@ -12,6 +12,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,6 +25,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -42,9 +44,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -112,8 +118,36 @@ class MainActivity : ComponentActivity() {
                 val updateState by updater.state.collectAsStateWithLifecycle()
                 var destination by rememberSaveable { mutableStateOf(DESTINATION_MAIN) }
                 var selectedWorkout by rememberSaveable { mutableStateOf<String?>(null) }
+                var fullscreen by rememberSaveable { mutableStateOf(false) }
+                var fullscreenHandledRecordingId by rememberSaveable { mutableStateOf<String?>(null) }
                 val keepScreenAwake = shouldKeepScreenAwake(state.connection)
                 LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { updater.automaticCheck() }
+                LaunchedEffect(state.recordingId, state.connection) {
+                    val recordingId = state.recordingId
+                    if (recordingId == null) {
+                        if (fullscreenHandledRecordingId != null) {
+                            fullscreen = false
+                            fullscreenHandledRecordingId = null
+                        }
+                        if (!canShowFullscreen(state.connection)) fullscreen = false
+                    } else if (recordingId != fullscreenHandledRecordingId) {
+                        fullscreenHandledRecordingId = recordingId
+                        fullscreen = true
+                    }
+                }
+                DisposableEffect(fullscreen) {
+                    val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+                    if (fullscreen) {
+                        insetsController.systemBarsBehavior =
+                            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                        insetsController.hide(WindowInsetsCompat.Type.systemBars())
+                    } else {
+                        insetsController.show(WindowInsetsCompat.Type.systemBars())
+                    }
+                    onDispose {
+                        if (fullscreen) insetsController.show(WindowInsetsCompat.Type.systemBars())
+                    }
+                }
                 DisposableEffect(keepScreenAwake) {
                     if (keepScreenAwake) {
                         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -126,32 +160,23 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
-                BackHandler(destination != DESTINATION_MAIN) {
+                BackHandler(fullscreen) { fullscreen = false }
+                BackHandler(!fullscreen && destination != DESTINATION_MAIN) {
                     if (destination == DESTINATION_DETAIL) {
                         destination = DESTINATION_HISTORY
                     } else {
                         destination = DESTINATION_MAIN
                     }
                 }
-                when (destination) {
-                    DESTINATION_HISTORY -> HistoryRoute(
-                        viewModel = historyViewModel,
-                        onBack = { destination = DESTINATION_MAIN },
-                        onWorkout = {
-                            selectedWorkout = it
-                            destination = DESTINATION_DETAIL
-                        },
+                if (fullscreen) {
+                    FullscreenMetricsScreen(
+                        state = state,
+                        onExit = { fullscreen = false },
+                        onStop = app.controller::stopWorkout,
                     )
-
-                    DESTINATION_DETAIL -> if (selectedWorkout != null) {
-                        WorkoutDetailRoute(
-                            workoutId = selectedWorkout!!,
-                            viewModel = historyViewModel,
-                            onBack = { destination = DESTINATION_HISTORY },
-                            onRetrySync = { healthLauncher.launch(app.healthWriter.permissions) },
-                        )
-                    } else {
-                        HistoryRoute(
+                } else {
+                    when (destination) {
+                        DESTINATION_HISTORY -> HistoryRoute(
                             viewModel = historyViewModel,
                             onBack = { destination = DESTINATION_MAIN },
                             onWorkout = {
@@ -159,35 +184,54 @@ class MainActivity : ComponentActivity() {
                                 destination = DESTINATION_DETAIL
                             },
                         )
-                    }
 
-                    else -> BridgeScreen(
-                        state = state,
-                        onConnectSetup = ::ensureBluetooth,
-                        onScan = app.controller::scan,
-                        onConnect = app.controller::connect,
-                        onStart = {
-                            if (hasBluetoothPermissions()) {
-                                healthLauncher.launch(app.healthWriter.permissions)
-                                app.controller.startWorkout()
-                            } else {
-                                ensureBluetooth()
-                            }
-                        },
-                        onStop = app.controller::stopWorkout,
-                        onMonitoringChanged = ::setMonitoringEnabled,
-                        onTargetChanged = app.controller::setNextWorkoutTarget,
-                        onHealthPermissions = { healthLauncher.launch(app.healthWriter.permissions) },
-                        onHistory = { destination = DESTINATION_HISTORY },
-                        updateState = updateState,
-                        updatesEnabled = !BuildConfig.DEBUG,
-                        updateInstallAllowed = state.recordingId == null && state.connection != ConnectionState.FINALIZING,
-                        onCheckUpdates = updater::manualCheck,
-                        onStartUpdate = updater::startDownload,
-                        onDismissUpdate = updater::dismiss,
-                        onInstallUpdate = ::requestUpdateInstall,
-                        onShareDiagnostics = { shareDiagnostics(state) },
-                    )
+                        DESTINATION_DETAIL -> if (selectedWorkout != null) {
+                            WorkoutDetailRoute(
+                                workoutId = selectedWorkout!!,
+                                viewModel = historyViewModel,
+                                onBack = { destination = DESTINATION_HISTORY },
+                                onRetrySync = { healthLauncher.launch(app.healthWriter.permissions) },
+                            )
+                        } else {
+                            HistoryRoute(
+                                viewModel = historyViewModel,
+                                onBack = { destination = DESTINATION_MAIN },
+                                onWorkout = {
+                                    selectedWorkout = it
+                                    destination = DESTINATION_DETAIL
+                                },
+                            )
+                        }
+
+                        else -> BridgeScreen(
+                            state = state,
+                            onConnectSetup = ::ensureBluetooth,
+                            onScan = app.controller::scan,
+                            onConnect = app.controller::connect,
+                            onStart = {
+                                if (hasBluetoothPermissions()) {
+                                    healthLauncher.launch(app.healthWriter.permissions)
+                                    app.controller.startWorkout()
+                                } else {
+                                    ensureBluetooth()
+                                }
+                            },
+                            onStop = app.controller::stopWorkout,
+                            onMonitoringChanged = ::setMonitoringEnabled,
+                            onTargetChanged = app.controller::setNextWorkoutTarget,
+                            onHealthPermissions = { healthLauncher.launch(app.healthWriter.permissions) },
+                            onHistory = { destination = DESTINATION_HISTORY },
+                            updateState = updateState,
+                            updatesEnabled = !BuildConfig.DEBUG,
+                            updateInstallAllowed = state.recordingId == null && state.connection != ConnectionState.FINALIZING,
+                            onCheckUpdates = updater::manualCheck,
+                            onStartUpdate = updater::startDownload,
+                            onDismissUpdate = updater::dismiss,
+                            onInstallUpdate = ::requestUpdateInstall,
+                            onShareDiagnostics = { shareDiagnostics(state) },
+                            onFullscreen = { fullscreen = true },
+                        )
+                    }
                 }
             }
         }
@@ -270,6 +314,8 @@ class MainActivity : ComponentActivity() {
 
 internal fun shouldKeepScreenAwake(connection: ConnectionState): Boolean = connection == ConnectionState.READY || connection == ConnectionState.RECORDING
 
+internal fun canShowFullscreen(connection: ConnectionState): Boolean = connection == ConnectionState.READY || connection == ConnectionState.RECORDING
+
 @Composable
 private fun BridgeScreen(
     state: BridgeState,
@@ -290,6 +336,7 @@ private fun BridgeScreen(
     onDismissUpdate: () -> Unit,
     onInstallUpdate: () -> Unit,
     onShareDiagnostics: () -> Unit,
+    onFullscreen: () -> Unit,
 ) {
     var diagnostics by remember { mutableStateOf(false) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -357,6 +404,13 @@ private fun BridgeScreen(
                 }
             }
             if (state.connection in setOf(ConnectionState.READY, ConnectionState.RECORDING, ConnectionState.FINALIZING)) {
+                if (canShowFullscreen(state.connection)) {
+                    item {
+                        OutlinedButton(onClick = onFullscreen, modifier = Modifier.fillMaxWidth()) {
+                            Text("Fullscreen live data")
+                        }
+                    }
+                }
                 item {
                     Metrics(
                         duration = state.startedAt?.let {
@@ -406,6 +460,134 @@ private fun BridgeScreen(
                     OutlinedButton(onClick = onShareDiagnostics) { Text("Share diagnostic log") }
                 }
                 items(state.diagnostics) { line -> Text(line, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FullscreenMetricsScreen(
+    state: BridgeState,
+    onExit: () -> Unit,
+    onStop: () -> Unit,
+) {
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(state.startedAt) {
+        while (state.startedAt != null) {
+            now = System.currentTimeMillis()
+            delay(1_000)
+        }
+    }
+    val duration = state.startedAt?.let {
+        Duration.between(it, Instant.ofEpochMilli(now)).seconds.coerceAtLeast(0)
+    } ?: 0
+    val metrics = dashboardMetrics(state, duration)
+
+    BoxWithConstraints(Modifier.fillMaxSize().padding(12.dp)) {
+        val landscape = maxWidth > maxHeight
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(if (state.recordingId == null) "Live data" else "Workout in progress", style = MaterialTheme.typography.titleLarge)
+                    Text(stateLabel(state), color = MaterialTheme.colorScheme.primary)
+                }
+                TextButton(onClick = onExit) { Text("Exit fullscreen") }
+            }
+            if (landscape) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    metrics.forEach { metric ->
+                        FullscreenMetric(metric, Modifier.weight(1f).fillMaxSize())
+                    }
+                }
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FullscreenMetric(metrics[0], Modifier.weight(1f).fillMaxSize())
+                        FullscreenMetric(metrics[1], Modifier.weight(1f).fillMaxSize())
+                    }
+                    Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FullscreenMetric(metrics[2], Modifier.weight(1f).fillMaxSize())
+                        FullscreenMetric(metrics[3], Modifier.weight(1f).fillMaxSize())
+                    }
+                    FullscreenMetric(metrics[4], Modifier.fillMaxWidth().weight(1f))
+                }
+            }
+            if (state.recordingId != null) {
+                Button(onClick = onStop, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (state.monitoringEnabled) "Finish now" else "Stop and save")
+                }
+            }
+        }
+    }
+}
+
+private data class DashboardMetric(
+    val label: String,
+    val value: String,
+    val target: String? = null,
+    val progress: Float? = null,
+)
+
+private fun dashboardMetrics(state: BridgeState, duration: Long): List<DashboardMetric> {
+    val durationValue = "%02d:%02d:%02d".format(duration / 3600, duration / 60 % 60, duration % 60)
+    val durationTarget = state.target as? WorkoutTarget.Duration
+    val distanceTarget = state.target as? WorkoutTarget.Distance
+    return listOf(
+        DashboardMetric(
+            "Duration",
+            durationValue,
+            durationTarget?.let(::formatTarget),
+            durationTarget?.let { targetProgress(it, duration, state.distanceMeters) },
+        ),
+        DashboardMetric("Speed", state.latest?.speedKph?.let { String.format(Locale.US, "%.1f km/h", it) } ?: "—"),
+        DashboardMetric("Cadence", state.latest?.cadenceRpm?.let { String.format(Locale.US, "%.0f rpm", it) } ?: "—"),
+        DashboardMetric("Power", state.latest?.powerWatts?.let { "$it W" } ?: "—"),
+        DashboardMetric(
+            "Distance",
+            String.format(Locale.US, "%.2f km", state.distanceMeters / 1_000.0),
+            distanceTarget?.let(::formatTarget),
+            distanceTarget?.let { targetProgress(it, duration, state.distanceMeters) },
+        ),
+    )
+}
+
+@Composable
+private fun FullscreenMetric(metric: DashboardMetric, modifier: Modifier) {
+    Card(modifier) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(metric.label, style = MaterialTheme.typography.titleMedium)
+            Text(
+                metric.value,
+                style = MaterialTheme.typography.headlineMedium,
+                textAlign = TextAlign.Center,
+            )
+            metric.target?.let { target ->
+                Text(
+                    if (metric.progress == 1f) "$target · Target reached" else "Target $target",
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center,
+                )
+                LinearProgressIndicator(
+                    progress = { metric.progress ?: 0f },
+                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                )
             }
         }
     }
