@@ -114,7 +114,7 @@ class WorkoutDaoTest {
         }
 
         val migrated = Room.databaseBuilder(context, BridgeDatabase::class.java, name)
-            .addMigrations(BridgeDatabase.MIGRATION_1_2)
+            .addMigrations(BridgeDatabase.MIGRATION_1_2, BridgeDatabase.MIGRATION_2_3)
             .allowMainThreadQueries()
             .build()
         try {

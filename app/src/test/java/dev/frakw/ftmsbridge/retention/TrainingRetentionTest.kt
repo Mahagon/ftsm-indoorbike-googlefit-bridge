@@ -91,12 +91,13 @@ class TrainingRetentionTest {
     @Test
     fun `warning reflects actual storage and protected history`() {
         assertNull(RetentionStatus(databaseBytes = RetentionStatus.BACKUP_TARGET_BYTES, loading = false).warning)
-        assertTrue(
+        assertEquals(
+            RetentionWarning.BACKUP_BLOCKED,
             RetentionStatus(
                 databaseBytes = RetentionStatus.BACKUP_TARGET_BYTES + 1,
                 cleanupBlocked = true,
                 loading = false,
-            ).warning!!.contains("20 MiB"),
+            ).warning,
         )
     }
 

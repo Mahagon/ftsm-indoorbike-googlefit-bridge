@@ -20,8 +20,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLocale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.frakw.ftmsbridge.R
 import dev.frakw.ftmsbridge.data.WorkoutEntity
 import dev.frakw.ftmsbridge.data.target
 import dev.frakw.ftmsbridge.formatTarget
@@ -67,25 +69,25 @@ private fun HistoryScreen(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { ScreenHeader("Exercise history", onBack) }
+            item { ScreenHeader(stringResource(R.string.exercise_history), onBack) }
             if (page.isLoading) {
-                item { Text("Loading history…") }
+                item { Text(stringResource(R.string.loading_history)) }
             } else if (page.workouts.isEmpty()) {
-                item { Text("No completed workouts yet.", style = MaterialTheme.typography.bodyLarge) }
+                item { Text(stringResource(R.string.no_workouts), style = MaterialTheme.typography.bodyLarge) }
             }
             items(page.workouts, key = { it.id }) { workout ->
                 Card(onClick = { onWorkout(workout.id) }, modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(formatDateTime(workout.startedAtMillis), style = MaterialTheme.typography.titleMedium)
-                        SummaryRow("Duration", formatDuration(workout))
-                        SummaryRow("Distance", formatDistance(workout.distanceMeters))
+                        SummaryRow(stringResource(R.string.duration), formatDuration(workout))
+                        SummaryRow(stringResource(R.string.distance), formatDistance(workout.distanceMeters))
                         Text(syncLabel(workout), color = syncColor(workout))
                     }
                 }
             }
             if (page.hasMore) {
                 item {
-                    Button(onClick = onLoadMore, modifier = Modifier.fillMaxWidth()) { Text("Load more") }
+                    Button(onClick = onLoadMore, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.load_more)) }
                 }
             }
         }
@@ -98,39 +100,46 @@ private fun WorkoutDetailScreen(
     onBack: () -> Unit,
     onRetrySync: () -> Unit,
 ) {
+    val locale = Locale.forLanguageTag(LocalLocale.current.toLanguageTag())
     Scaffold { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { ScreenHeader("Workout details", onBack) }
+            item { ScreenHeader(stringResource(R.string.workout_details), onBack) }
             if (details == null) {
-                item { Text("Loading workout…") }
+                item { Text(stringResource(R.string.loading_workout)) }
             } else {
                 val workout = details.workout
                 item {
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            DetailRow("Started", formatDateTime(workout.startedAtMillis))
-                            DetailRow("Ended", workout.endedAtMillis?.let(::formatDateTime) ?: "—")
-                            DetailRow("Duration", formatDuration(workout))
-                            DetailRow("Distance", formatDistance(workout.distanceMeters))
+                            DetailRow(stringResource(R.string.started), formatDateTime(workout.startedAtMillis))
+                            DetailRow(stringResource(R.string.ended), workout.endedAtMillis?.let(::formatDateTime) ?: "—")
+                            DetailRow(stringResource(R.string.duration), formatDuration(workout))
+                            DetailRow(stringResource(R.string.distance), formatDistance(workout.distanceMeters))
+                            workout.caloriesKcal?.let {
+                                DetailRow(stringResource(R.string.calories), String.format(locale, "%.0f kcal", it))
+                            }
                             workout.target()?.let { target ->
-                                DetailRow("Target", formatTarget(target))
-                                DetailRow("Target result", if (targetReached(workout) == true) "Reached" else "Not reached")
+                                DetailRow(stringResource(R.string.target), formatTarget(target))
+                                DetailRow(
+                                    stringResource(R.string.target_result),
+                                    stringResource(if (targetReached(workout) == true) R.string.reached else R.string.not_reached),
+                                )
                             }
                         }
                     }
                 }
                 if (details.hasSamples) {
-                    item { MetricCard("Speed", details.speedKph, "km/h") }
-                    item { MetricCard("Cadence", details.cadenceRpm, "rpm") }
-                    item { MetricCard("Power", details.powerWatts, "W") }
+                    item { MetricCard(stringResource(R.string.speed), details.speedKph, "km/h") }
+                    item { MetricCard(stringResource(R.string.cadence), details.cadenceRpm, "rpm") }
+                    item { MetricCard(stringResource(R.string.power), details.powerWatts, "W") }
                 } else {
                     item {
                         Card(Modifier.fillMaxWidth()) {
                             Text(
-                                "Detailed metrics are unavailable for this workout.",
+                                stringResource(R.string.detailed_metrics_unavailable),
                                 modifier = Modifier.padding(16.dp),
                             )
                         }
@@ -139,12 +148,13 @@ private fun WorkoutDetailScreen(
                 item {
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Health Connect", style = MaterialTheme.typography.titleMedium)
+                            Text(stringResource(R.string.health_connect), style = MaterialTheme.typography.titleMedium)
                             Text(syncLabel(workout), color = syncColor(workout))
                             workout.syncError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                             if (!workout.synced) {
-                                Button(onClick = onRetrySync) { Text("Retry sync") }
+                                Button(onClick = onRetrySync) { Text(stringResource(R.string.retry_save)) }
                             }
+                            Text(stringResource(R.string.health_google_hint), style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
@@ -159,7 +169,7 @@ private fun ScreenHeader(title: String, onBack: () -> Unit) {
         modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TextButton(onClick = onBack) { Text("Back") }
+        TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
         Text(title, style = MaterialTheme.typography.headlineMedium)
     }
 }
@@ -171,10 +181,10 @@ private fun MetricCard(label: String, summary: MetricSummary?, unit: String) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(label, style = MaterialTheme.typography.titleMedium)
             if (summary == null) {
-                Text("No data")
+                Text(stringResource(R.string.no_data))
             } else {
-                DetailRow("Average", String.format(locale, "%.1f %s", summary.average, unit))
-                DetailRow("Maximum", String.format(locale, "%.1f %s", summary.maximum, unit))
+                DetailRow(stringResource(R.string.average), String.format(locale, "%.1f %s", summary.average, unit))
+                DetailRow(stringResource(R.string.maximum), String.format(locale, "%.1f %s", summary.maximum, unit))
             }
         }
     }
@@ -191,10 +201,15 @@ private fun DetailRow(label: String, value: String) {
     }
 }
 
-internal fun syncLabel(workout: WorkoutEntity): String = when {
-    workout.synced -> "Synced"
-    workout.syncError != null -> "Failed"
-    else -> "Pending"
+@Composable
+internal fun syncLabel(workout: WorkoutEntity): String = stringResource(
+    syncLabelResource(workout),
+)
+
+internal fun syncLabelResource(workout: WorkoutEntity): Int = when {
+    workout.synced -> R.string.saved_health_connect
+    workout.syncError != null -> R.string.save_failed
+    else -> R.string.save_pending
 }
 
 @Composable

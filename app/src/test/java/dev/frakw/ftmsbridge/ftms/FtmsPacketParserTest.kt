@@ -55,6 +55,23 @@ class FtmsPacketParserTest {
     }
 
     @Test
+    fun parsesTotalEnergy() {
+        val packet = byteArrayOf(
+            0x00,
+            0x01,
+            0x10,
+            0x0E,
+            0x7B,
+            0x00,
+            0x34,
+            0x12,
+            0x05,
+        )
+        val sample = (parser.parse(packet, time) as FtmsPacketParser.Result.Success).sample
+        assertEquals(123, sample.totalEnergyKcal)
+    }
+
+    @Test
     fun rejectsTruncatedOptionalField() {
         val result = parser.parse(byteArrayOf(0x04, 0x00, 0x10, 0x0E, 0x01), time)
         assertTrue(result is FtmsPacketParser.Result.Failure)

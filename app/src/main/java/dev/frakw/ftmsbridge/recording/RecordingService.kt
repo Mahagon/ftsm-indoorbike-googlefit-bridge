@@ -11,6 +11,7 @@ import android.os.IBinder
 import androidx.core.content.ContextCompat
 import dev.frakw.ftmsbridge.BridgeApplication
 import dev.frakw.ftmsbridge.MainActivity
+import dev.frakw.ftmsbridge.R
 import dev.frakw.ftmsbridge.model.BridgeState
 import dev.frakw.ftmsbridge.model.ConnectionState
 import kotlinx.coroutines.CoroutineScope
@@ -29,7 +30,7 @@ class RecordingService : Service() {
     override fun onCreate() {
         super.onCreate()
         getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel(CHANNEL, "Bike background monitoring", NotificationManager.IMPORTANCE_LOW),
+            NotificationChannel(CHANNEL, getString(R.string.monitoring_channel), NotificationManager.IMPORTANCE_LOW),
         )
     }
 
@@ -80,19 +81,19 @@ class RecordingService : Service() {
         return Notification
             .Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_media_play)
-            .setContentTitle("FTMS Bike Bridge")
+            .setContentTitle(getString(R.string.app_name))
             .setContentText(notificationText(state))
             .setContentIntent(open)
             .setOngoing(true)
-            .addAction(Notification.Action.Builder(null, "Stop monitoring", disable).build())
+            .addAction(Notification.Action.Builder(null, getString(R.string.stop_monitoring), disable).build())
             .build()
     }
 
     private fun notificationText(state: BridgeState): String = when {
-        state.recordingId != null -> "Recording ${state.bike?.name.orEmpty()}"
-        state.connection == ConnectionState.READY -> "Connected · waiting for ride data"
-        state.connection == ConnectionState.CONNECTING -> "Waiting for ${state.bike?.name ?: "bike"}"
-        else -> "Background monitoring active"
+        state.recordingId != null -> getString(R.string.recording_bike, state.bike?.name.orEmpty())
+        state.connection == ConnectionState.READY -> getString(R.string.connected_waiting)
+        state.connection == ConnectionState.CONNECTING -> getString(R.string.waiting_bike, state.bike?.name ?: getString(R.string.bike))
+        else -> getString(R.string.monitoring_active)
     }
 
     companion object {

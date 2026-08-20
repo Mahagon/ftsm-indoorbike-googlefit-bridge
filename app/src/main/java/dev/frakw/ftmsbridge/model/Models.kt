@@ -9,6 +9,7 @@ data class IndoorBikeSample(
     val powerWatts: Int?,
     val totalDistanceMeters: Long?,
     val elapsedTimeSeconds: Int?,
+    val totalEnergyKcal: Int? = null,
 )
 
 sealed interface WorkoutTarget {

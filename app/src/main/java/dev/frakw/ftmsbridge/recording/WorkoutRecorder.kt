@@ -17,10 +17,13 @@ class WorkoutRecorder(
     private var lastSample: IndoorBikeSample? = null
     private var lastBikeDistance: Long? = null
     private var calculatedDistance = 0.0
+    private var lastBikeEnergy: Int? = null
+    private var calculatedEnergy = 0.0
 
     suspend fun restore(): WorkoutEntity? = dao.activeWorkout()?.also {
         active = it
         calculatedDistance = it.distanceMeters
+        calculatedEnergy = it.caloriesKcal ?: 0.0
     }
 
     suspend fun start(
@@ -39,6 +42,8 @@ class WorkoutRecorder(
         lastSample = null
         lastBikeDistance = null
         calculatedDistance = 0.0
+        lastBikeEnergy = null
+        calculatedEnergy = 0.0
         return workout
     }
 
@@ -58,6 +63,16 @@ class WorkoutRecorder(
             }
         }
         lastSample = sample
+        sample.totalEnergyKcal?.let { energy ->
+            lastBikeEnergy?.let { previousEnergy ->
+                calculatedEnergy += when {
+                    energy >= previousEnergy -> (energy - previousEnergy).toDouble()
+                    previousEnergy > 60_000 -> (65_536 - previousEnergy + energy).toDouble()
+                    else -> energy.toDouble()
+                }
+            }
+            lastBikeEnergy = energy
+        }
 
         val second = sample.timestamp.epochSecond
         if (second != lastStoredSecond) {
@@ -69,10 +84,16 @@ class WorkoutRecorder(
                     cadenceRpm = sample.cadenceRpm,
                     powerWatts = sample.powerWatts,
                     bikeDistanceMeters = sample.totalDistanceMeters,
+                    sessionDistanceMeters = calculatedDistance,
+                    bikeEnergyKcal = sample.totalEnergyKcal,
+                    sessionEnergyKcal = sample.totalEnergyKcal?.let { calculatedEnergy },
                 ),
             )
             lastStoredSecond = second
-            active = workout.copy(distanceMeters = calculatedDistance)
+            active = workout.copy(
+                distanceMeters = calculatedDistance,
+                caloriesKcal = sample.totalEnergyKcal?.let { calculatedEnergy },
+            )
             dao.upsertWorkout(active!!)
         }
         return calculatedDistance
@@ -84,6 +105,7 @@ class WorkoutRecorder(
             workout.copy(
                 endedAtMillis = max(at.toEpochMilli(), workout.startedAtMillis + 1),
                 distanceMeters = calculatedDistance,
+                caloriesKcal = lastBikeEnergy?.let { calculatedEnergy },
                 state = WorkoutEntity.STATE_COMPLETE,
             )
         dao.upsertWorkout(completed)

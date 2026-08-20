@@ -18,6 +18,7 @@ jobs:
           java-version: "17"
       - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
         with:
+          cmdline-tools-version: "15859902"
           packages: platform-tools
       - name: Install Android SDK
         run: sdkmanager --channel=3 "platforms;android-37.0" "build-tools;37.0.0"
@@ -51,38 +52,42 @@ jobs:
           java-version: "17"
       - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
         with:
+          cmdline-tools-version: "15859902"
           packages: platform-tools
       - name: Install Android 37 emulator SDK
         run: |
-          SDKMANAGER="$(command -v sdkmanager)"
-          "$SDKMANAGER" --channel=3 \
+          sdkmanager --channel=3 \
             "platforms;android-37.0" "build-tools;37.0.0" \
             "system-images;android-37.0;google_apis_ps16k;x86_64"
-          dirname "$SDKMANAGER" >> "$GITHUB_PATH"
+          avdmanager list device | grep -q 'id:.*"pixel_9"' || {
+            echo "Pixel 9 hardware profile is unavailable" >&2
+            exit 1
+          }
+          echo no | avdmanager create avd --force --name test \
+            --package "system-images;android-37.0;google_apis_ps16k;x86_64" \
+            --device pixel_9
       - uses: gradle/actions/setup-gradle@4733eaac7c1b0da527e4206b7671e0061de1ce37 # v6
       - name: Run instrumentation tests on Android 37
-        uses: ReactiveCircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808 # v2
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: "37.0"
           channel: canary
           target: google_apis_ps16k
           arch: x86_64
-          # The Android SDK has no pixel_7a AVD profile; Pixel 7 is the closest supported device.
-          profile: pixel_7
+          profile: pixel_9
+          disk-size: 8G
+          force-avd-creation: false
           disable-animations: true
           disable-linux-hw-accel: false
-          script: |
-            set +e
-            ./gradlew connectedDebugAndroidTest --no-daemon
-            status=$?
-            mkdir -p app/build/reports/androidTests/diagnostics
-            adb logcat -d > app/build/reports/androidTests/diagnostics/logcat.txt || true
-            adb shell getprop > app/build/reports/androidTests/diagnostics/device-properties.txt || true
-            exit $status
+          emulator-options: -no-window -gpu software -no-snapshot -noaudio -no-boot-anim
+          script: bash .github/scripts/android_smoke_test.sh
       - name: Upload instrumentation reports on failure
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: api-37-instrumentation-reports
-          path: app/build/reports/androidTests/
+          path: |
+            app/build/reports/androidTests/
+            app/build/outputs/androidTest-results/
+            ${{ runner.temp }}/smoke-diagnostics/
           if-no-files-found: ignore

@@ -17,6 +17,7 @@ data class WorkoutEntity(
     val syncError: String? = null,
     val targetDurationSeconds: Long? = null,
     val targetDistanceMeters: Double? = null,
+    val caloriesKcal: Double? = null,
 ) {
     companion object {
         const val STATE_ACTIVE = "ACTIVE"
@@ -50,6 +51,9 @@ data class SampleEntity(
     val cadenceRpm: Double?,
     val powerWatts: Int?,
     val bikeDistanceMeters: Long?,
+    val sessionDistanceMeters: Double? = null,
+    val bikeEnergyKcal: Int? = null,
+    val sessionEnergyKcal: Double? = null,
 )
 
 data class WorkoutWithSamples(

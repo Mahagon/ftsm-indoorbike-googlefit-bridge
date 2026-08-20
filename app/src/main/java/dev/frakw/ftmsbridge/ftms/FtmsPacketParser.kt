@@ -30,10 +30,13 @@ class FtmsPacketParser {
         if (flags and 0x0020 != 0) reader.s16() // resistance level
         val power = if (flags and 0x0040 != 0) reader.s16() else null
         if (flags and 0x0080 != 0) reader.s16() // average power
-        if (flags and 0x0100 != 0) {
-            reader.u16() // total energy
+        val totalEnergy = if (flags and 0x0100 != 0) {
+            val value = reader.u16()
             reader.u16() // energy per hour
             reader.u8() // energy per minute
+            value
+        } else {
+            null
         }
         if (flags and 0x0200 != 0) reader.u8() // heart rate
         if (flags and 0x0400 != 0) reader.u8() // MET
@@ -41,7 +44,7 @@ class FtmsPacketParser {
         if (flags and 0x1000 != 0) reader.u16() // remaining time
 
         Result.Success(
-            IndoorBikeSample(timestamp, speed, cadence, power, distance, elapsed),
+            IndoorBikeSample(timestamp, speed, cadence, power, distance, elapsed, totalEnergy),
         )
     } catch (error: IllegalArgumentException) {
         Result.Failure(error.message ?: "Malformed FTMS packet")

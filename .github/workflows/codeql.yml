@@ -47,5 +47,10 @@ jobs:
           queries: security-extended
       - if: matrix.build-mode == 'manual'
         name: Build application for analysis
-        run: ./gradlew compileDebugKotlin --no-daemon
+        # CodeQL 2.26.3 supports Kotlin versions below 2.4.20. Keep the
+        # production build patched while using a cache-free compatible
+        # compiler only in this isolated analysis checkout.
+        run: |
+          sed -i 's/version "2.4.20-Beta2"/version "2.4.10"/' build.gradle.kts
+          ./gradlew compileDebugKotlin --no-daemon --no-build-cache --no-configuration-cache
       - uses: github/codeql-action/analyze@988661ebb5e81487b3fb31b2185d2856c0a10679 # v4

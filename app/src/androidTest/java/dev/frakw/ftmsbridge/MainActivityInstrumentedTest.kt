@@ -1,5 +1,6 @@
 package dev.frakw.ftmsbridge
 
+import android.content.pm.ActivityInfo
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -19,6 +20,20 @@ class MainActivityInstrumentedTest {
             scenario.onActivity { activity ->
                 assertFalse(activity.isFinishing)
                 assertEquals(Lifecycle.State.RESUMED, activity.lifecycle.currentState)
+            }
+        }
+    }
+
+    @Test
+    fun mainActivitySupportsPortraitAndLandscape() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            listOf(
+                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT,
+                ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE,
+            ).forEach { orientation ->
+                scenario.onActivity { it.requestedOrientation = orientation }
+                InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+                scenario.onActivity { assertFalse(it.isFinishing) }
             }
         }
     }

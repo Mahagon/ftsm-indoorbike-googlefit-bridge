@@ -47,9 +47,12 @@ class HistoryTest {
 
     @Test
     fun `sync label reflects persisted state`() {
-        assertEquals("Pending", syncLabel(workout("pending", 1)))
-        assertEquals("Failed", syncLabel(workout("failed", 1).copy(syncError = "denied")))
-        assertEquals("Synced", syncLabel(workout("synced", 1).copy(synced = true, syncError = "old")))
+        assertEquals(dev.frakw.ftmsbridge.R.string.save_pending, syncLabelResource(workout("pending", 1)))
+        assertEquals(dev.frakw.ftmsbridge.R.string.save_failed, syncLabelResource(workout("failed", 1).copy(syncError = "denied")))
+        assertEquals(
+            dev.frakw.ftmsbridge.R.string.saved_health_connect,
+            syncLabelResource(workout("synced", 1).copy(synced = true, syncError = "old")),
+        )
     }
 
     private fun workout(id: String, started: Long) = WorkoutEntity(
