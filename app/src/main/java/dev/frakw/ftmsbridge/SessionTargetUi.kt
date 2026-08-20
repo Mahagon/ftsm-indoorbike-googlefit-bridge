@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
@@ -81,8 +82,8 @@ internal fun TargetEditor(current: WorkoutTarget?, onTargetChanged: (WorkoutTarg
     }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Session target", style = MaterialTheme.typography.titleMedium)
-            Text("Applies to the next workout only", style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.session_target), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.target_next_only), style = MaterialTheme.typography.bodySmall)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
                     selected = kind == TargetKind.DURATION,
@@ -91,7 +92,7 @@ internal fun TargetEditor(current: WorkoutTarget?, onTargetChanged: (WorkoutTarg
                         input = ""
                         invalid = false
                     },
-                    label = { Text("Duration") },
+                    label = { Text(stringResource(R.string.duration)) },
                 )
                 FilterChip(
                     selected = kind == TargetKind.DISTANCE,
@@ -100,7 +101,7 @@ internal fun TargetEditor(current: WorkoutTarget?, onTargetChanged: (WorkoutTarg
                         input = ""
                         invalid = false
                     },
-                    label = { Text("Distance") },
+                    label = { Text(stringResource(R.string.distance)) },
                 )
             }
             OutlinedTextField(
@@ -110,12 +111,12 @@ internal fun TargetEditor(current: WorkoutTarget?, onTargetChanged: (WorkoutTarg
                     invalid = false
                 },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text(if (kind == TargetKind.DURATION) "Minutes" else "Kilometers") },
-                suffix = { Text(if (kind == TargetKind.DURATION) "min" else "km") },
+                label = { Text(stringResource(if (kind == TargetKind.DURATION) R.string.minutes else R.string.kilometers)) },
+                suffix = { Text(stringResource(if (kind == TargetKind.DURATION) R.string.minutes_short else R.string.kilometers_short)) },
                 singleLine = true,
                 isError = invalid,
                 supportingText = if (invalid) {
-                    { Text(if (kind == TargetKind.DURATION) "Enter positive whole minutes" else "Enter a positive distance") }
+                    { Text(stringResource(if (kind == TargetKind.DURATION) R.string.invalid_minutes else R.string.invalid_distance)) }
                 } else {
                     null
                 },
@@ -130,7 +131,7 @@ internal fun TargetEditor(current: WorkoutTarget?, onTargetChanged: (WorkoutTarg
                         invalid = target == null
                         if (target != null) onTargetChanged(target)
                     },
-                ) { Text(if (current == null) "Set target" else "Update target") }
+                ) { Text(stringResource(if (current == null) R.string.set_target else R.string.update_target)) }
                 if (current != null) {
                     TextButton(
                         onClick = {
@@ -138,7 +139,7 @@ internal fun TargetEditor(current: WorkoutTarget?, onTargetChanged: (WorkoutTarg
                             invalid = false
                             onTargetChanged(null)
                         },
-                    ) { Text("Clear") }
+                    ) { Text(stringResource(R.string.clear)) }
                 }
             }
         }
@@ -161,7 +162,11 @@ internal fun ProgressMetric(label: String, value: String, target: String, progre
             Column {
                 Text(label)
                 Text(
-                    if (progress >= 1f) "$target · Target reached" else "Target $target",
+                    if (progress >= 1f) {
+                        stringResource(R.string.target_reached_value, target)
+                    } else {
+                        stringResource(R.string.target_value, target)
+                    },
                     style = MaterialTheme.typography.bodySmall,
                 )
             }

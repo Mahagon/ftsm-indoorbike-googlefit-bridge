@@ -27,17 +27,11 @@ data class RetentionStatus(
 ) {
     val retainedHours: Double get() = retainedSeconds / 3_600.0
     val exceedsBackupTarget: Boolean get() = databaseBytes > BACKUP_TARGET_BYTES
-    val warning: String?
+    val warning: RetentionWarning?
         get() = when {
-            exceedsBackupTarget && cleanupBlocked ->
-                "Workout storage exceeds 20 MiB because protected workouts cannot be removed yet."
-
-            exceedsBackupTarget ->
-                "Workout storage exceeds the recommended 20 MiB cloud-backup target."
-
-            cleanupBlocked ->
-                "Protected workouts currently exceed the configured retention limit."
-
+            exceedsBackupTarget && cleanupBlocked -> RetentionWarning.BACKUP_BLOCKED
+            exceedsBackupTarget -> RetentionWarning.BACKUP_TARGET
+            cleanupBlocked -> RetentionWarning.PROTECTED_LIMIT
             else -> null
         }
 
@@ -45,6 +39,8 @@ data class RetentionStatus(
         const val BACKUP_TARGET_BYTES = 20L * 1024L * 1024L
     }
 }
+
+enum class RetentionWarning { BACKUP_BLOCKED, BACKUP_TARGET, PROTECTED_LIMIT }
 
 internal class TrainingRetentionPreferences(context: Context) {
     private val values = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)

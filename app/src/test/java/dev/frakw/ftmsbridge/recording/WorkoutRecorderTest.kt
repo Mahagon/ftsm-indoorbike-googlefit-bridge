@@ -75,6 +75,19 @@ class WorkoutRecorderTest {
     }
 
     @Test
+    fun accumulatesReportedEnergyAcrossCounterReset() = runTest {
+        val dao = FakeDao()
+        val recorder = WorkoutRecorder(dao)
+        val start = Instant.parse("2026-08-18T12:00:00Z")
+        recorder.start(start)
+        recorder.accept(IndoorBikeSample(start, null, null, null, null, null, 10))
+        recorder.accept(IndoorBikeSample(start.plusSeconds(1), null, null, null, null, null, 14))
+        recorder.accept(IndoorBikeSample(start.plusSeconds(2), null, null, null, null, null, 1))
+        val completed = recorder.stop(start.plusSeconds(3))
+        assertEquals(5.0, completed?.caloriesKcal ?: 0.0, 0.001)
+    }
+
+    @Test
     fun stopCompletesWorkoutAndKeepsDistance() = runTest {
         val dao = FakeDao()
         val recorder = WorkoutRecorder(dao)

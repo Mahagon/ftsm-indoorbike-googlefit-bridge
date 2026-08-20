@@ -23,9 +23,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import dev.frakw.ftmsbridge.R
 import java.util.Locale
 
 class RetentionViewModel internal constructor(
@@ -58,12 +60,11 @@ fun RetentionScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Training history retention", style = MaterialTheme.typography.headlineSmall)
-                TextButton(onClick = onBack) { Text("Back") }
+                Text(stringResource(R.string.training_retention), style = MaterialTheme.typography.headlineSmall)
+                TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
             }
             Text(
-                "Oldest workouts are removed after they have synced to Health Connect. " +
-                    "Active, unsynced, and the newest completed workout are always protected.",
+                stringResource(R.string.retention_description),
             )
             OutlinedTextField(
                 value = hoursText,
@@ -72,9 +73,9 @@ fun RetentionScreen(
                     saved = false
                 },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Retain training history (hours)") },
+                label = { Text(stringResource(R.string.retain_hours)) },
                 supportingText = {
-                    Text("Default: 36 hours, approximately 20 MiB. Allowed: 1–10,000 hours.")
+                    Text(stringResource(R.string.retention_default))
                 },
                 isError = hoursText.isNotBlank() && parsedHours == null,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -82,7 +83,7 @@ fun RetentionScreen(
             )
             if ((parsedHours ?: 0) > TrainingRetentionPreferences.DEFAULT_HOURS) {
                 Text(
-                    "This setting may exceed the recommended 20 MiB cloud-backup target.",
+                    stringResource(R.string.retention_large_warning),
                     color = MaterialTheme.colorScheme.error,
                 )
             }
@@ -93,21 +94,20 @@ fun RetentionScreen(
                 },
                 enabled = parsedHours != null && parsedHours != status.configuredHours,
             ) {
-                Text("Save retention")
+                Text(stringResource(R.string.save_retention))
             }
-            if (saved) Text("Retention saved. Cleanup will run in the background.")
+            if (saved) Text(stringResource(R.string.retention_saved))
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Current storage", style = MaterialTheme.typography.titleMedium)
-                    Text(String.format(Locale.US, "%.1f training hours retained", status.retainedHours))
-                    Text(formatStorage(status.databaseBytes))
-                    if (status.loading) Text("Calculating…", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.current_storage), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.training_hours_retained, status.retainedHours))
+                    Text(stringResource(R.string.storage_used, status.databaseBytes / 1024.0 / 1024.0))
+                    if (status.loading) Text(stringResource(R.string.calculating), style = MaterialTheme.typography.bodySmall)
                 }
             }
             status.warning?.let { RetentionWarningCard(it) }
             Text(
-                "Android backs up automatically when the device is eligible. The app backup limit is 25 MB; " +
-                    "20 MiB is used here as a safer warning target.",
+                stringResource(R.string.backup_explanation),
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -115,11 +115,19 @@ fun RetentionScreen(
 }
 
 @Composable
-fun RetentionWarningCard(message: String) {
+fun RetentionWarningCard(message: RetentionWarning) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Backup storage warning", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
-            Text(message)
+            Text(stringResource(R.string.backup_warning), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
+            Text(
+                stringResource(
+                    when (message) {
+                        RetentionWarning.BACKUP_BLOCKED -> R.string.retention_warning_backup_blocked
+                        RetentionWarning.BACKUP_TARGET -> R.string.retention_warning_backup_target
+                        RetentionWarning.PROTECTED_LIMIT -> R.string.retention_warning_protected
+                    },
+                ),
+            )
         }
     }
 }

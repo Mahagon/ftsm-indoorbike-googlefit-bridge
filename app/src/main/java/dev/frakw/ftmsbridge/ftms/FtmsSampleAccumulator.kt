@@ -14,6 +14,7 @@ internal class FtmsSampleAccumulator {
                 powerWatts = sample.powerWatts ?: old?.powerWatts,
                 totalDistanceMeters = sample.totalDistanceMeters ?: old?.totalDistanceMeters,
                 elapsedTimeSeconds = sample.elapsedTimeSeconds ?: old?.elapsedTimeSeconds,
+                totalEnergyKcal = sample.totalEnergyKcal ?: old?.totalEnergyKcal,
             ).also { previous = it }
     }
 

@@ -13,6 +13,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.frakw.ftmsbridge.BuildConfig
 import dev.frakw.ftmsbridge.MainActivity
+import dev.frakw.ftmsbridge.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -72,11 +73,11 @@ class UpdateViewModel(
             try {
                 val checksum = parseChecksum(client.text(release.checksumUrl), release.apkName)
                 val target = targetFile(release.apkName)
-                if (target.exists() && !target.delete()) throw UpdateException("Could not replace the previous download")
+                if (target.exists() && !target.delete()) throw UpdateException(getApplication<Application>().getString(R.string.update_replace_failed))
                 target.parentFile?.mkdirs()
                 val request = DownloadManager.Request(Uri.parse(release.apkUrl))
-                    .setTitle("FTMS Bike Bridge ${release.tag}")
-                    .setDescription("Downloading app update")
+                    .setTitle(getApplication<Application>().getString(R.string.update_download_title, release.tag))
+                    .setDescription(getApplication<Application>().getString(R.string.downloading_update))
                     .setMimeType(APK_MIME)
                     .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
                     .setDestinationInExternalFilesDir(
@@ -110,12 +111,12 @@ class UpdateViewModel(
                 val dismissed = preferences.isDismissed(release.tag, clock.millis())
                 mutableState.value = when {
                     newer && (manual || !dismissed) -> UpdateUiState(UpdateStatus.AVAILABLE, release)
-                    manual && !newer -> UpdateUiState(UpdateStatus.UP_TO_DATE, message = "You already have the latest version.")
+                    manual && !newer -> UpdateUiState(UpdateStatus.UP_TO_DATE, message = getApplication<Application>().getString(R.string.latest_version))
                     else -> UpdateUiState()
                 }
             } catch (error: Exception) {
                 mutableState.value = if (manual) {
-                    UpdateUiState(UpdateStatus.ERROR, message = error.message ?: "Update check failed")
+                    UpdateUiState(UpdateStatus.ERROR, message = error.message ?: getApplication<Application>().getString(R.string.update_check_failed))
                 } else {
                     UpdateUiState()
                 }
@@ -147,7 +148,7 @@ class UpdateViewModel(
 
                     DownloadManager.STATUS_FAILED -> {
                         preferences.clearDownload()
-                        fail(saved.release, UpdateException("Download failed (reason ${snapshot.reason})"))
+                        fail(saved.release, UpdateException(getApplication<Application>().getString(R.string.update_download_failed, snapshot.reason)))
                         return@launch
                     }
 
@@ -158,7 +159,7 @@ class UpdateViewModel(
 
                     else -> {
                         preferences.clearDownload()
-                        fail(saved.release, UpdateException("The update download is no longer available"))
+                        fail(saved.release, UpdateException(getApplication<Application>().getString(R.string.update_download_unavailable)))
                         return@launch
                     }
                 }
@@ -183,13 +184,13 @@ class UpdateViewModel(
     private suspend fun verify(saved: SavedDownload) = withContext(Dispatchers.IO) {
         try {
             val file = targetFile(saved.release.apkName)
-            if (!file.isFile) throw UpdateException("Downloaded APK was not found")
-            if (!sha256(file).equals(saved.checksum, ignoreCase = true)) throw UpdateException("Downloaded APK checksum does not match")
             val application = getApplication<Application>()
+            if (!file.isFile) throw UpdateException(application.getString(R.string.update_apk_missing))
+            if (!sha256(file).equals(saved.checksum, ignoreCase = true)) throw UpdateException(application.getString(R.string.update_checksum_mismatch))
             val packageInfo = application.packageManager.getPackageArchiveInfo(file.path, 0)
-                ?: throw UpdateException("Downloaded file is not a valid APK")
-            if (packageInfo.packageName != BuildConfig.APPLICATION_ID) throw UpdateException("Downloaded APK has the wrong package ID")
-            if (packageInfo.longVersionCode <= BuildConfig.VERSION_CODE) throw UpdateException("Downloaded APK is not a newer version")
+                ?: throw UpdateException(application.getString(R.string.update_invalid_apk))
+            if (packageInfo.packageName != BuildConfig.APPLICATION_ID) throw UpdateException(application.getString(R.string.update_wrong_package))
+            if (packageInfo.longVersionCode <= BuildConfig.VERSION_CODE) throw UpdateException(application.getString(R.string.update_not_newer))
             ApkSignatureVerifier(application.packageManager, BuildConfig.APPLICATION_ID).verify(file)
             mutableState.value = UpdateUiState(UpdateStatus.READY, saved.release, progress = 100)
             notifyReady(saved.release)
@@ -212,7 +213,7 @@ class UpdateViewModel(
         val application = getApplication<Application>()
         val manager = application.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
-            NotificationChannel(UPDATE_CHANNEL, "App updates", NotificationManager.IMPORTANCE_DEFAULT),
+            NotificationChannel(UPDATE_CHANNEL, application.getString(R.string.update_channel), NotificationManager.IMPORTANCE_DEFAULT),
         )
         val open = PendingIntent.getActivity(
             application,
@@ -224,8 +225,8 @@ class UpdateViewModel(
             UPDATE_NOTIFICATION_ID,
             Notification.Builder(application, UPDATE_CHANNEL)
                 .setSmallIcon(android.R.drawable.stat_sys_download_done)
-                .setContentTitle("FTMS Bike Bridge ${release.tag} is ready")
-                .setContentText("Open the app to install the verified update")
+                .setContentTitle(application.getString(R.string.update_ready_title, release.tag))
+                .setContentText(application.getString(R.string.update_ready_text))
                 .setContentIntent(open)
                 .setAutoCancel(true)
                 .build(),

@@ -6,8 +6,10 @@ import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.PowerRecord
 import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.records.SpeedRecord
+import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import androidx.health.connect.client.records.metadata.Device
 import androidx.health.connect.client.records.metadata.Metadata
+import androidx.health.connect.client.units.Energy
 import androidx.health.connect.client.units.Length
 import androidx.health.connect.client.units.Power
 import androidx.health.connect.client.units.Velocity
@@ -18,7 +20,7 @@ import java.time.ZoneId
 class HealthConnectRecordMapper(
     private val zoneId: ZoneId = ZoneId.systemDefault(),
 ) {
-    fun map(value: WorkoutWithSamples): List<Record> {
+    fun map(value: WorkoutWithSamples, title: String = "Exercise bike"): List<Record> {
         val workout = value.workout
         val endMillis = requireNotNull(workout.endedAtMillis) { "Only completed workouts can be exported" }
         require(endMillis >= workout.startedAtMillis) { "Workout end must not precede its start" }
@@ -46,19 +48,19 @@ class HealthConnectRecordMapper(
                 endTime = end,
                 endZoneOffset = endOffset,
                 exerciseType = ExerciseSessionRecord.EXERCISE_TYPE_BIKING_STATIONARY,
-                title = "Indoor bike",
+                title = title,
                 metadata = metadata("session"),
             )
-        if (workout.distanceMeters > 0) {
-            records +=
-                DistanceRecord(
-                    startTime = start,
-                    startZoneOffset = startOffset,
-                    endTime = end,
-                    endZoneOffset = endOffset,
-                    distance = Length.meters(workout.distanceMeters),
-                    metadata = metadata("distance"),
-                )
+        records += distanceRecords(workout.distanceMeters, samples, start, end, ::metadata)
+        workout.caloriesKcal?.takeIf { it > 0.0 }?.let { calories ->
+            records += TotalCaloriesBurnedRecord(
+                startTime = start,
+                startZoneOffset = startOffset,
+                endTime = end,
+                endZoneOffset = endOffset,
+                energy = Energy.kilocalories(calories),
+                metadata = metadata("calories"),
+            )
         }
         val speeds =
             samples.mapNotNull { row ->
@@ -96,5 +98,47 @@ class HealthConnectRecordMapper(
             records += PowerRecord(start, startOffset, end, endOffset, powers, metadata("power"))
         }
         return records
+    }
+
+    private fun distanceRecords(
+        totalMeters: Double,
+        samples: List<dev.frakw.ftmsbridge.data.SampleEntity>,
+        start: Instant,
+        end: Instant,
+        metadata: (String) -> Metadata,
+    ): List<DistanceRecord> {
+        if (totalMeters <= 0.0) return emptyList()
+        val durationMillis = (end.toEpochMilli() - start.toEpochMilli()).coerceAtLeast(1L)
+        val buckets = sortedMapOf<Long, Double>()
+        var previous = 0.0
+        samples.forEach { sample ->
+            val cumulative = sample.sessionDistanceMeters ?: return@forEach
+            val normalized = cumulative.coerceIn(previous, totalMeters)
+            val delta = normalized - previous
+            if (delta > 0.0) {
+                val bucket = ((sample.timestampMillis - start.toEpochMilli()).coerceAtLeast(0L) / 60_000L)
+                    .coerceAtMost((durationMillis - 1L) / 60_000L)
+                buckets[bucket] = buckets.getOrDefault(bucket, 0.0) + delta
+            }
+            previous = normalized
+        }
+        val remainder = totalMeters - buckets.values.sum()
+        if (remainder > 0.000_001) {
+            val lastBucket = (durationMillis - 1L) / 60_000L
+            buckets[lastBucket] = buckets.getOrDefault(lastBucket, 0.0) + remainder
+        }
+        return buckets.mapNotNull { (bucket, meters) ->
+            if (meters <= 0.0) return@mapNotNull null
+            val intervalStart = start.plusMillis(bucket * 60_000L)
+            val intervalEnd = minOf(end, start.plusMillis((bucket + 1L) * 60_000L))
+            DistanceRecord(
+                startTime = intervalStart,
+                startZoneOffset = zoneId.rules.getOffset(intervalStart),
+                endTime = intervalEnd,
+                endZoneOffset = zoneId.rules.getOffset(intervalEnd),
+                distance = Length.meters(meters),
+                metadata = metadata("distance-$bucket"),
+            )
+        }
     }
 }

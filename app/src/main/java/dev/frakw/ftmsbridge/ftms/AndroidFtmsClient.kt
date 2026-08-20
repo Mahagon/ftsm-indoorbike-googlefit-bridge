@@ -16,6 +16,7 @@ import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.os.Build
 import android.os.ParcelUuid
+import dev.frakw.ftmsbridge.R
 import dev.frakw.ftmsbridge.model.ConnectionState
 import dev.frakw.ftmsbridge.model.DiscoveredBike
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,7 +47,7 @@ class AndroidFtmsClient(
                 result: ScanResult,
             ) {
                 val address = result.device.address
-                val name = result.scanRecord?.deviceName ?: result.device.name ?: "FTMS bike"
+                val name = result.scanRecord?.deviceName ?: result.device.name ?: appContext.getString(R.string.ftms_bike)
                 val device = DiscoveredBike(name, address, result.rssi)
                 mutableState.update {
                     it.copy(
@@ -57,7 +58,7 @@ class AndroidFtmsClient(
                 }
             }
 
-            override fun onScanFailed(errorCode: Int) = fail("Bluetooth scan failed ($errorCode)")
+            override fun onScanFailed(errorCode: Int) = fail(appContext.getString(R.string.bluetooth_scan_failed, errorCode))
         }
 
     private val callback =
@@ -76,7 +77,7 @@ class AndroidFtmsClient(
                         sampleAccumulator.reset()
                         gatt.close()
                         if (this@AndroidFtmsClient.gatt === gatt) this@AndroidFtmsClient.gatt = null
-                        fail("Bike disconnected (GATT $status)")
+                        fail(appContext.getString(R.string.bike_disconnected, status))
                     }
 
                     newState == BluetoothProfile.STATE_CONNECTED -> {
@@ -99,20 +100,20 @@ class AndroidFtmsClient(
                 status: Int,
             ) {
                 if (!isCurrent(gatt)) return
-                if (status != BluetoothGatt.GATT_SUCCESS) return fail("Service discovery failed ($status)")
+                if (status != BluetoothGatt.GATT_SUCCESS) return fail(appContext.getString(R.string.service_discovery_failed, status))
                 val service =
                     gatt.getService(FTMS_SERVICE)
-                        ?: return fail("Device does not expose the FTMS service")
+                        ?: return fail(appContext.getString(R.string.ftms_service_missing))
                 addDiagnostic("FTMS characteristics: " + service.characteristics.joinToString { it.uuid.toString() })
                 val data =
                     service.getCharacteristic(INDOOR_BIKE_DATA)
-                        ?: return fail("Indoor Bike Data characteristic is missing")
+                        ?: return fail(appContext.getString(R.string.bike_data_missing))
                 if (!gatt.setCharacteristicNotification(data, true)) {
-                    return fail("Could not enable Indoor Bike Data notifications")
+                    return fail(appContext.getString(R.string.bike_notifications_failed))
                 }
-                val cccd = data.getDescriptor(CCCD) ?: return fail("Indoor Bike Data has no CCCD")
+                val cccd = data.getDescriptor(CCCD) ?: return fail(appContext.getString(R.string.bike_cccd_missing))
                 val accepted = gatt.writeDescriptor(cccd, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
-                if (accepted != BluetoothGatt.GATT_SUCCESS) fail("Could not configure notifications ($accepted)")
+                if (accepted != BluetoothGatt.GATT_SUCCESS) fail(appContext.getString(R.string.notification_config_failed, accepted))
             }
 
             override fun onDescriptorWrite(
@@ -126,7 +127,7 @@ class AndroidFtmsClient(
                     addDiagnostic("Indoor Bike Data notifications enabled")
                     mutableState.update { it.copy(connection = ConnectionState.READY, error = null) }
                 } else {
-                    fail("Notification descriptor write failed ($status)")
+                    fail(appContext.getString(R.string.notification_write_failed, status))
                 }
             }
 
@@ -159,7 +160,7 @@ class AndroidFtmsClient(
         }
 
     override fun startScan() {
-        if (adapter?.isEnabled != true) return fail("Bluetooth is turned off")
+        if (adapter?.isEnabled != true) return fail(appContext.getString(R.string.bluetooth_off))
         mutableState.update {
             it.copy(
                 connection = ConnectionState.SCANNING,
@@ -169,7 +170,7 @@ class AndroidFtmsClient(
         }
         val filter = ScanFilter.Builder().setServiceUuid(ParcelUuid(FTMS_SERVICE)).build()
         val settings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
-        scanner?.startScan(listOf(filter), settings, scanCallback) ?: fail("BLE scanner unavailable")
+        scanner?.startScan(listOf(filter), settings, scanCallback) ?: fail(appContext.getString(R.string.ble_scanner_unavailable))
     }
 
     override fun stopScan() {
@@ -185,14 +186,14 @@ class AndroidFtmsClient(
 
     override fun connect(address: String) {
         stopScan()
-        if (adapter?.isEnabled != true) return fail("Bluetooth is turned off")
-        val device = adapter?.getRemoteDevice(address) ?: return fail("Bike address is invalid")
+        if (adapter?.isEnabled != true) return fail(appContext.getString(R.string.bluetooth_off))
+        val device = adapter?.getRemoteDevice(address) ?: return fail(appContext.getString(R.string.bike_address_invalid))
         mutableState.update {
             it.copy(
                 connection = ConnectionState.CONNECTING,
                 selected =
                 it.devices.firstOrNull { discovered -> discovered.address == address }
-                    ?: DiscoveredBike(device.name ?: "FTMS bike", address, 0),
+                    ?: DiscoveredBike(device.name ?: appContext.getString(R.string.ftms_bike), address, 0),
                 latest = null,
                 error = null,
             )

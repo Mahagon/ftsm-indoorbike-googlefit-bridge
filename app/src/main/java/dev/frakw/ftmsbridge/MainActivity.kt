@@ -43,6 +43,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLocale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -303,20 +305,20 @@ class MainActivity : ComponentActivity() {
 
     private fun shareDiagnostics(state: BridgeState) {
         val body = buildString {
-            appendLine("FTMS Bike Bridge diagnostics")
-            appendLine("Bike: ${state.bike}")
-            appendLine("State: ${state.connection}")
-            appendLine("Last packet: ${state.rawPacket}")
+            appendLine(getString(R.string.diagnostics_report_title))
+            appendLine(getString(R.string.diagnostics_bike, state.bike))
+            appendLine(getString(R.string.diagnostics_state, state.connection))
+            appendLine(getString(R.string.diagnostics_last_packet, state.rawPacket))
             state.diagnostics.forEach(::appendLine)
         }
         startActivity(
             Intent.createChooser(
                 Intent(Intent.ACTION_SEND).apply {
                     type = "text/plain"
-                    putExtra(Intent.EXTRA_SUBJECT, "FTMS diagnostics")
+                    putExtra(Intent.EXTRA_SUBJECT, getString(R.string.diagnostics_subject))
                     putExtra(Intent.EXTRA_TEXT, body)
                 },
-                "Share diagnostics",
+                getString(R.string.share_diagnostics_chooser),
             ),
         )
     }
@@ -371,7 +373,7 @@ private fun BridgeScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                Text("FTMS Bike Bridge", style = MaterialTheme.typography.headlineMedium)
+                Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
                 Text(stateLabel(state), color = MaterialTheme.colorScheme.primary)
             }
             retentionStatus.warning?.let { message ->
@@ -396,8 +398,8 @@ private fun BridgeScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text("Background monitoring", style = MaterialTheme.typography.titleMedium)
-                        Text("Reconnect and record automatically", style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(R.string.background_monitoring), style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.reconnect_automatically), style = MaterialTheme.typography.bodySmall)
                     }
                     Switch(checked = state.monitoringEnabled, onCheckedChange = onMonitoringChanged)
                 }
@@ -409,13 +411,13 @@ private fun BridgeScreen(
             if (state.connection == ConnectionState.DISCONNECTED || state.connection == ConnectionState.ERROR) {
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = onConnectSetup) { Text("Connect last bike") }
-                        OutlinedButton(onClick = onScan) { Text("Scan") }
+                        Button(onClick = onConnectSetup) { Text(stringResource(R.string.connect_last_bike)) }
+                        OutlinedButton(onClick = onScan) { Text(stringResource(R.string.scan)) }
                     }
                 }
             }
             if (state.connection == ConnectionState.SCANNING) {
-                item { Text("Nearby FTMS bikes") }
+                item { Text(stringResource(R.string.nearby_bikes)) }
                 items(state.devices, key = { it.address }) { bike ->
                     Card(onClick = { onConnect(bike.address) }, modifier = Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp)) {
@@ -429,7 +431,7 @@ private fun BridgeScreen(
                 if (canShowFullscreen(state.connection)) {
                     item {
                         OutlinedButton(onClick = onFullscreen, modifier = Modifier.fillMaxWidth()) {
-                            Text("Fullscreen live data")
+                            Text(stringResource(R.string.fullscreen_live))
                         }
                     }
                 }
@@ -447,14 +449,14 @@ private fun BridgeScreen(
                 }
                 item {
                     if (state.monitoringEnabled && state.recordingId == null) {
-                        Text("Recording starts automatically when bike data arrives")
+                        Text(stringResource(R.string.automatic_recording))
                     } else if (state.recordingId == null) {
                         Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
-                            Text("Start workout")
+                            Text(stringResource(R.string.start_workout))
                         }
                     } else {
                         Button(onClick = onStop, modifier = Modifier.fillMaxWidth()) {
-                            Text(if (state.monitoringEnabled) "Finish now" else "Stop and save")
+                            Text(stringResource(if (state.monitoringEnabled) R.string.finish_now else R.string.stop_save))
                         }
                     }
                 }
@@ -462,25 +464,25 @@ private fun BridgeScreen(
             item {
                 Column {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = onHistory) { Text("History") }
-                        TextButton(onClick = onHealthPermissions) { Text("Health permissions") }
+                        TextButton(onClick = onHistory) { Text(stringResource(R.string.history)) }
+                        TextButton(onClick = onHealthPermissions) { Text(stringResource(R.string.health_permissions)) }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (updatesEnabled) {
-                            TextButton(onClick = onCheckUpdates) { Text("Check updates") }
+                            TextButton(onClick = onCheckUpdates) { Text(stringResource(R.string.check_updates)) }
                         }
-                        TextButton(onClick = onRetention) { Text("Storage") }
-                        TextButton(onClick = { diagnostics = !diagnostics }) { Text("Diagnostics") }
+                        TextButton(onClick = onRetention) { Text(stringResource(R.string.storage)) }
+                        TextButton(onClick = { diagnostics = !diagnostics }) { Text(stringResource(R.string.diagnostics)) }
                     }
                 }
             }
             if (diagnostics) {
                 item {
                     HorizontalDivider()
-                    Text("Raw packet", style = MaterialTheme.typography.titleMedium)
-                    Text(state.rawPacket ?: "No packet received", fontFamily = FontFamily.Monospace)
+                    Text(stringResource(R.string.raw_packet), style = MaterialTheme.typography.titleMedium)
+                    Text(state.rawPacket ?: stringResource(R.string.no_packet), fontFamily = FontFamily.Monospace)
                     Spacer(Modifier.height(8.dp))
-                    OutlinedButton(onClick = onShareDiagnostics) { Text("Share diagnostic log") }
+                    OutlinedButton(onClick = onShareDiagnostics) { Text(stringResource(R.string.share_diagnostics)) }
                 }
                 items(state.diagnostics) { line -> Text(line, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall) }
             }
@@ -518,10 +520,10 @@ private fun FullscreenMetricsScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text(if (state.recordingId == null) "Live data" else "Workout in progress", style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(if (state.recordingId == null) R.string.live_data else R.string.workout_in_progress), style = MaterialTheme.typography.titleLarge)
                     Text(stateLabel(state), color = MaterialTheme.colorScheme.primary)
                 }
-                TextButton(onClick = onExit) { Text("Exit fullscreen") }
+                TextButton(onClick = onExit) { Text(stringResource(R.string.exit_fullscreen)) }
             }
             if (landscape) {
                 Row(
@@ -550,7 +552,7 @@ private fun FullscreenMetricsScreen(
             }
             if (state.recordingId != null) {
                 Button(onClick = onStop, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (state.monitoringEnabled) "Finish now" else "Stop and save")
+                    Text(stringResource(if (state.monitoringEnabled) R.string.finish_now else R.string.stop_save))
                 }
             }
         }
@@ -564,23 +566,25 @@ private data class DashboardMetric(
     val progress: Float? = null,
 )
 
+@Composable
 private fun dashboardMetrics(state: BridgeState, duration: Long): List<DashboardMetric> {
+    val locale = Locale.forLanguageTag(LocalLocale.current.toLanguageTag())
     val durationValue = "%02d:%02d:%02d".format(duration / 3600, duration / 60 % 60, duration % 60)
     val durationTarget = state.target as? WorkoutTarget.Duration
     val distanceTarget = state.target as? WorkoutTarget.Distance
     return listOf(
         DashboardMetric(
-            "Duration",
+            stringResource(R.string.duration),
             durationValue,
             durationTarget?.let(::formatTarget),
             durationTarget?.let { targetProgress(it, duration, state.distanceMeters) },
         ),
-        DashboardMetric("Speed", state.latest?.speedKph?.let { String.format(Locale.US, "%.1f km/h", it) } ?: "—"),
-        DashboardMetric("Cadence", state.latest?.cadenceRpm?.let { String.format(Locale.US, "%.0f rpm", it) } ?: "—"),
-        DashboardMetric("Power", state.latest?.powerWatts?.let { "$it W" } ?: "—"),
+        DashboardMetric(stringResource(R.string.speed), state.latest?.speedKph?.let { String.format(locale, "%.1f km/h", it) } ?: "—"),
+        DashboardMetric(stringResource(R.string.cadence), state.latest?.cadenceRpm?.let { String.format(locale, "%.0f rpm", it) } ?: "—"),
+        DashboardMetric(stringResource(R.string.power), state.latest?.powerWatts?.let { "$it W" } ?: "—"),
         DashboardMetric(
-            "Distance",
-            String.format(Locale.US, "%.2f km", state.distanceMeters / 1_000.0),
+            stringResource(R.string.distance),
+            String.format(locale, "%.2f km", state.distanceMeters / 1_000.0),
             distanceTarget?.let(::formatTarget),
             distanceTarget?.let { targetProgress(it, duration, state.distanceMeters) },
         ),
@@ -603,7 +607,11 @@ private fun FullscreenMetric(metric: DashboardMetric, modifier: Modifier) {
             )
             metric.target?.let { target ->
                 Text(
-                    if (metric.progress == 1f) "$target · Target reached" else "Target $target",
+                    if (metric.progress == 1f) {
+                        stringResource(R.string.target_reached_value, target)
+                    } else {
+                        stringResource(R.string.target_value, target)
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     textAlign = TextAlign.Center,
                 )
@@ -627,9 +635,9 @@ private fun UpdateCard(
 ) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("App update", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.app_update), style = MaterialTheme.typography.titleMedium)
             state.release?.let { release ->
-                Text("${release.title} is available")
+                Text(stringResource(R.string.update_available, release.title))
                 if (release.notes.isNotBlank()) {
                     Text(release.notes, style = MaterialTheme.typography.bodySmall, maxLines = 4)
                 }
@@ -638,25 +646,25 @@ private fun UpdateCard(
                 Text(it, color = if (state.status == UpdateStatus.ERROR) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
             }
             when (state.status) {
-                UpdateStatus.CHECKING -> Text("Checking for updates…")
+                UpdateStatus.CHECKING -> Text(stringResource(R.string.checking_updates))
 
-                UpdateStatus.DOWNLOADING -> Text("Downloading… ${state.progress?.let { "$it%" } ?: ""}")
+                UpdateStatus.DOWNLOADING -> Text(stringResource(R.string.downloading_progress, state.progress?.let { "$it%" } ?: ""))
 
                 UpdateStatus.AVAILABLE -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = onDownload) { Text("Update") }
-                    TextButton(onClick = onLater) { Text("Later") }
+                    Button(onClick = onDownload) { Text(stringResource(R.string.update)) }
+                    TextButton(onClick = onLater) { Text(stringResource(R.string.later)) }
                 }
 
                 UpdateStatus.READY -> {
-                    Button(onClick = onInstall, enabled = installAllowed) { Text("Install") }
-                    if (!installAllowed) Text("Finish the active workout before installing.")
+                    Button(onClick = onInstall, enabled = installAllowed) { Text(stringResource(R.string.install)) }
+                    if (!installAllowed) Text(stringResource(R.string.finish_before_install))
                 }
 
-                UpdateStatus.UP_TO_DATE -> TextButton(onClick = onLater) { Text("Dismiss") }
+                UpdateStatus.UP_TO_DATE -> TextButton(onClick = onLater) { Text(stringResource(R.string.dismiss)) }
 
                 UpdateStatus.ERROR -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = if (state.release == null) onRetry else onDownload) { Text("Retry") }
-                    TextButton(onClick = onLater) { Text("Dismiss") }
+                    Button(onClick = if (state.release == null) onRetry else onDownload) { Text(stringResource(R.string.retry)) }
+                    TextButton(onClick = onLater) { Text(stringResource(R.string.dismiss)) }
                 }
 
                 UpdateStatus.IDLE -> Unit
@@ -674,21 +682,22 @@ private fun Metrics(
     distance: Double,
     target: WorkoutTarget?,
 ) {
+    val locale = Locale.forLanguageTag(LocalLocale.current.toLanguageTag())
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         val durationValue = "%02d:%02d:%02d".format(duration / 3600, duration / 60 % 60, duration % 60)
         if (target is WorkoutTarget.Duration) {
-            ProgressMetric("Duration", durationValue, formatTarget(target), targetProgress(target, duration, distance) ?: 0f)
+            ProgressMetric(stringResource(R.string.duration), durationValue, formatTarget(target), targetProgress(target, duration, distance) ?: 0f)
         } else {
-            Metric("Duration", durationValue)
+            Metric(stringResource(R.string.duration), durationValue)
         }
-        Metric("Speed", speed?.let { String.format(Locale.US, "%.1f km/h", it) } ?: "—")
-        Metric("Cadence", cadence?.let { String.format(Locale.US, "%.0f rpm", it) } ?: "—")
-        Metric("Power", power?.let { "$it W" } ?: "—")
-        val distanceValue = String.format(Locale.US, "%.2f km", distance / 1000.0)
+        Metric(stringResource(R.string.speed), speed?.let { String.format(locale, "%.1f km/h", it) } ?: "—")
+        Metric(stringResource(R.string.cadence), cadence?.let { String.format(locale, "%.0f rpm", it) } ?: "—")
+        Metric(stringResource(R.string.power), power?.let { "$it W" } ?: "—")
+        val distanceValue = String.format(locale, "%.2f km", distance / 1000.0)
         if (target is WorkoutTarget.Distance) {
-            ProgressMetric("Distance", distanceValue, formatTarget(target), targetProgress(target, duration, distance) ?: 0f)
+            ProgressMetric(stringResource(R.string.distance), distanceValue, formatTarget(target), targetProgress(target, duration, distance) ?: 0f)
         } else {
-            Metric("Distance", distanceValue)
+            Metric(stringResource(R.string.distance), distanceValue)
         }
     }
 }
@@ -703,19 +712,20 @@ private fun Metric(label: String, value: String) {
     }
 }
 
+@Composable
 private fun stateLabel(state: BridgeState): String = when (state.connection) {
     ConnectionState.DISCONNECTED ->
-        "Not connected"
+        stringResource(R.string.connection_not_connected)
 
-    ConnectionState.SCANNING -> "Scanning…"
+    ConnectionState.SCANNING -> stringResource(R.string.connection_scanning)
 
-    ConnectionState.CONNECTING -> "Connecting…"
+    ConnectionState.CONNECTING -> stringResource(R.string.connection_connecting)
 
-    ConnectionState.READY -> "Ready · ${state.bike?.name.orEmpty()}"
+    ConnectionState.READY -> stringResource(R.string.connection_ready, state.bike?.name.orEmpty())
 
-    ConnectionState.RECORDING -> "Recording · ${state.bike?.name.orEmpty()}"
+    ConnectionState.RECORDING -> stringResource(R.string.connection_recording, state.bike?.name.orEmpty())
 
-    ConnectionState.FINALIZING -> "Saving workout…"
+    ConnectionState.FINALIZING -> stringResource(R.string.connection_saving)
 
-    ConnectionState.ERROR -> "Connection problem"
+    ConnectionState.ERROR -> stringResource(R.string.connection_problem)
 }
