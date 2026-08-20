@@ -52,7 +52,8 @@ jobs:
           api-level: 36
           target: google_apis
           arch: x86_64
-          profile: pixel_7a
+          # The Android SDK has no pixel_7a AVD profile; Pixel 7 is the closest supported device.
+          profile: pixel_7
           disable-animations: true
           script: ./gradlew connectedDebugAndroidTest --no-daemon
       - name: Upload instrumentation reports on failure
