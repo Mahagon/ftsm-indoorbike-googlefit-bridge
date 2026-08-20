@@ -1,6 +1,6 @@
-# FTMS Indoor Bike Google Fit Bridge
+# FTMS Indoor Bike Health Connect Bridge
 
-FTMS Bike Bridge is an Android app that records workouts from an FTMS-compatible indoor bike over Bluetooth Low Energy. Workouts are saved in the app, exported to Android Health Connect, and can then appear in Google Fit.
+FTMS Bike Bridge is an Android app that records workouts from an FTMS-compatible indoor bike over Bluetooth Low Energy. Workouts are saved in the app, exported to Android Health Connect, and can then appear in Google Health.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) to contribute and [SECURITY.md](SECURITY.md) to report a vulnerability privately.
 
@@ -93,18 +93,19 @@ Tap **Storage** to configure how many cumulative training hours remain in local 
 
 The Storage screen shows the measured database size. A warning also appears on the main screen when the database exceeds the recommended 20 MiB target or protected workouts prevent cleanup. Android limits Auto Backup to 25 MB per app, so grant Health Connect permissions or reduce retention if the warning persists.
 
-## Health Connect and Google Fit
+## Health Connect and Google Health
 
-FTMS Bike Bridge stores workouts locally and exports completed records to Health Connect. It does not communicate with Google Fit directly.
+FTMS Bike Bridge stores workouts locally and exports completed records to Health Connect. Google Health can read the shared workouts from Health Connect, so the bridge does not need Google sign-in or a direct Google Health API connection.
 
-To display the shared workouts in Google Fit:
+To display the shared workouts in Google Health:
 
-1. Open Google Fit.
-2. Open **Profile → Settings**.
-3. Under **Health Connect**, enable **Sync Fit with Health Connect**.
-4. Grant Google Fit access to the relevant exercise and activity data.
+1. Open Google Health.
+2. Open **Connections → Partner apps**.
+3. Under **Settings**, tap **Manage Health Connect** and complete setup if requested.
+4. Allow Google Health to read the relevant fitness and wellness data, including exercise and distance.
+5. Grant historical and background access when prompted so older and newly recorded workouts can remain synchronized.
 
-Google maintains the current setup steps in [Health Connect on Google Fit](https://support.google.com/fit/answer/12830119). Google Fit may show the session and distance without rendering every cadence or power sample in its own interface.
+Google maintains the current instructions in [Health Connect with Google Health](https://support.google.com/googlehealth/answer/14506680). Google Health currently reads exercise sessions and distance from Health Connect, but its published read list does not include speed, cycling cadence, or power. Those detailed samples remain available in Health Connect and compatible reader apps even when Google Health does not display them.
 
 ## App updates
 
@@ -128,7 +129,7 @@ Open **Diagnostics** to inspect the latest raw FTMS packet and discovered GATT c
 - **Bike connects but metrics remain empty:** inspect and share the diagnostic log; the firmware may use a non-standard FTMS packet layout.
 - **Old workout has no detailed metrics:** samples lost by an affected older release cannot be recovered. New rides recorded after the fix should contain them.
 - **Workout remains pending or failed:** open **Health permissions**, grant all requested write permissions, then retry from the workout details.
-- **Workout is absent in Google Fit:** confirm it exists in Health Connect, then confirm Google Fit synchronization and permissions.
+- **Workout is absent in Google Health:** confirm it exists in Health Connect, then open **Connections → Partner apps → Manage Health Connect** in Google Health and review synchronization and fitness permissions.
 - **Update check fails:** verify internet access and retry with **Check updates**. Releases must contain both the expected APK and matching `.sha256` asset.
 - **Android rejects an update:** install the APK signed by the same key as the existing app, or uninstall the old app first. Uninstalling removes local app data.
 
@@ -162,7 +163,7 @@ Hardware acceptance should cover:
 - A screen-off ride of at least 30 minutes.
 - A forced Bluetooth disconnect and reconnect.
 - Workout details containing the recorded metric summaries.
-- One non-duplicated session in Health Connect and Google Fit.
+- One non-duplicated session in Health Connect and Google Health.
 - A signed update from one release version to the next.
 
 ## Publishing signed releases
