@@ -10,7 +10,7 @@
     <string name="exercise_history">Trainingsverlauf</string><string name="loading_history">Verlauf wird geladen…</string><string name="no_workouts">Noch keine abgeschlossenen Trainings.</string><string name="load_more">Mehr laden</string><string name="workout_details">Trainingsdetails</string><string name="loading_workout">Training wird geladen…</string>
     <string name="started">Beginn</string><string name="ended">Ende</string><string name="target">Ziel</string><string name="target_result">Zielergebnis</string><string name="reached">Erreicht</string><string name="not_reached">Nicht erreicht</string><string name="detailed_metrics_unavailable">Für dieses Training sind keine detaillierten Messwerte verfügbar.</string>
     <string name="health_connect">Health Connect</string><string name="saved_health_connect">In Health Connect gespeichert</string><string name="save_failed">Speichern fehlgeschlagen</string><string name="save_pending">Speichern ausstehend</string><string name="retry_save">Erneut speichern</string>
-    <string name="health_google_hint">Die Prüfung kontrolliert, was diese App in Health Connect gespeichert hat. Google Health muss Training und Distanz separat importieren. Falls geprüfte Daten fehlen, kontrolliere Google Health → Verbindungen → Partner-Apps und die Datenquellen der Messwerte.</string>
+    <string name="health_google_hint">Fahrten werden als stationäres Radfahren mit echten Trainings- und Distanzeinträgen gespeichert. Google Health zeigt die Distanz oder das Training möglicherweise nicht im Dashboard an, obwohl Health Connect die Daten bestätigt.</string>
     <string name="verify_health_connect">Health Connect prüfen</string>
     <string name="verifying_health_connect">Prüfung läuft…</string>
     <string name="health_connect_verified">Health-Connect-Daten bestätigt</string>
@@ -23,7 +23,7 @@
     <string name="health_distance_comparison">Gespeichert / erwartet</string>
     <string name="health_issue_session_missing">Trainingseintrag fehlt</string>
     <string name="health_issue_session_duplicated">Trainingseintrag ist doppelt</string>
-    <string name="health_issue_session_type">Trainingstyp ist nicht Radfahren</string>
+    <string name="health_issue_session_type">Trainingstyp ist nicht stationäres Radfahren</string>
     <string name="health_issue_session_interval">Trainingszeitraum weicht ab</string>
     <string name="health_issue_session_version">Trainingsversion weicht ab</string>
     <string name="health_issue_distance_missing">Distanzeinträge fehlen</string>

@@ -53,7 +53,7 @@ internal fun verifyHealthConnectRecords(
         else -> issues += HealthConnectVerificationIssue.SESSION_DUPLICATED
     }
     session?.let {
-        if (it.exerciseType != ExerciseSessionRecord.EXERCISE_TYPE_BIKING) {
+        if (it.exerciseType != ExerciseSessionRecord.EXERCISE_TYPE_BIKING_STATIONARY) {
             issues += HealthConnectVerificationIssue.SESSION_TYPE_MISMATCH
         }
         if (it.startTime.toEpochMilli() != workout.startedAtMillis || it.endTime.toEpochMilli() != expectedEnd) {

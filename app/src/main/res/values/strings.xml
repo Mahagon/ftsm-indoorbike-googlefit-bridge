@@ -43,7 +43,7 @@
     <string name="save_failed">Save failed</string>
     <string name="save_pending">Waiting to save</string>
     <string name="retry_save">Retry save</string>
-    <string name="health_google_hint">Verification checks what this app stored in Health Connect. Google Health must separately import Exercise and Distance; check Google Health → Connections → Partner apps and its metric sources if verified data is missing.</string>
+    <string name="health_google_hint">Rides are saved as stationary cycling with genuine Exercise and Distance records. Google Health may omit stationary-bike distance or the workout from its dashboard even when Health Connect verification succeeds.</string>
     <string name="verify_health_connect">Verify Health Connect</string>
     <string name="verifying_health_connect">Verifying…</string>
     <string name="health_connect_verified">Health Connect records verified</string>
@@ -56,7 +56,7 @@
     <string name="health_distance_comparison">Stored / expected</string>
     <string name="health_issue_session_missing">Session is missing</string>
     <string name="health_issue_session_duplicated">Session is duplicated</string>
-    <string name="health_issue_session_type">Session type is not biking</string>
+    <string name="health_issue_session_type">Session type is not stationary cycling</string>
     <string name="health_issue_session_interval">Session time interval differs</string>
     <string name="health_issue_session_version">Session version differs</string>
     <string name="health_issue_distance_missing">Distance records are missing</string>

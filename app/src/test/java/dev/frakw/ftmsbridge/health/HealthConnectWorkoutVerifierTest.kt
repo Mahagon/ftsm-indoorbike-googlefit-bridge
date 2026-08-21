@@ -32,7 +32,7 @@ class HealthConnectWorkoutVerifierTest {
         val result = verifyHealthConnectRecords(value, listOf(session), distances)
         assertTrue(result.verified)
         assertEquals(1_000.0, result.storedDistanceMeters, 0.001)
-        assertEquals(ExerciseSessionRecord.EXERCISE_TYPE_BIKING, result.exerciseType)
+        assertEquals(ExerciseSessionRecord.EXERCISE_TYPE_BIKING_STATIONARY, result.exerciseType)
         assertEquals(HealthConnectRecordMapper.CLIENT_RECORD_VERSION, result.sessionVersion)
     }
 

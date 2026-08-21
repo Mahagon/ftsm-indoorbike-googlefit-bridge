@@ -86,7 +86,7 @@ class WorkoutDaoTest {
 
     @Test
     fun `migrations requeue completed workouts and preserve active workouts`() = runTest {
-        (1..3).forEach { version -> verifyMigrationFrom(version) }
+        (1..4).forEach { version -> verifyMigrationFrom(version) }
     }
 
     private suspend fun verifyMigrationFrom(version: Int) {
@@ -146,7 +146,12 @@ class WorkoutDaoTest {
         }
 
         val migrated = Room.databaseBuilder(context, BridgeDatabase::class.java, name)
-            .addMigrations(BridgeDatabase.MIGRATION_1_2, BridgeDatabase.MIGRATION_2_3, BridgeDatabase.MIGRATION_3_4)
+            .addMigrations(
+                BridgeDatabase.MIGRATION_1_2,
+                BridgeDatabase.MIGRATION_2_3,
+                BridgeDatabase.MIGRATION_3_4,
+                BridgeDatabase.MIGRATION_4_5,
+            )
             .allowMainThreadQueries()
             .build()
         try {
