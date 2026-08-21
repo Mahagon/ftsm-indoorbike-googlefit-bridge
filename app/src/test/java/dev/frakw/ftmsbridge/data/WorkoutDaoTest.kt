@@ -76,8 +76,17 @@ class WorkoutDaoTest {
     }
 
     @Test
+    fun `deleting an active workout cascades to its samples`() = runTest {
+        dao.upsertWorkout(WorkoutEntity(id = "short-ride", startedAtMillis = 1_000))
+        dao.upsertSample(SampleEntity("short-ride", 1_500, 20.0, 80.0, 150, 10))
+
+        assertEquals(1, dao.deleteActiveWorkout("short-ride"))
+        assertEquals(null, dao.workout("short-ride"))
+    }
+
+    @Test
     fun `migrations requeue completed workouts and preserve active workouts`() = runTest {
-        (1..3).forEach { version -> verifyMigrationFrom(version) }
+        (1..4).forEach { version -> verifyMigrationFrom(version) }
     }
 
     private suspend fun verifyMigrationFrom(version: Int) {
@@ -137,7 +146,12 @@ class WorkoutDaoTest {
         }
 
         val migrated = Room.databaseBuilder(context, BridgeDatabase::class.java, name)
-            .addMigrations(BridgeDatabase.MIGRATION_1_2, BridgeDatabase.MIGRATION_2_3, BridgeDatabase.MIGRATION_3_4)
+            .addMigrations(
+                BridgeDatabase.MIGRATION_1_2,
+                BridgeDatabase.MIGRATION_2_3,
+                BridgeDatabase.MIGRATION_3_4,
+                BridgeDatabase.MIGRATION_4_5,
+            )
             .allowMainThreadQueries()
             .build()
         try {

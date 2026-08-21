@@ -11,6 +11,7 @@ import kotlin.math.max
 
 class WorkoutRecorder(
     private val dao: WorkoutDao,
+    private val minimumWorkoutDurationMillis: Long = MINIMUM_WORKOUT_DURATION_MILLIS,
 ) {
     private var active: WorkoutEntity? = null
     private var lastStoredSecond: Long? = null
@@ -99,18 +100,24 @@ class WorkoutRecorder(
         return calculatedDistance
     }
 
-    suspend fun stop(at: Instant = Instant.now()): WorkoutEntity? {
+    suspend fun stop(at: Instant = Instant.now()): WorkoutStopResult? {
         val workout = active ?: return null
+        val endMillis = max(at.toEpochMilli(), workout.startedAtMillis + 1)
+        if (endMillis - workout.startedAtMillis < minimumWorkoutDurationMillis) {
+            dao.deleteActiveWorkout(workout.id)
+            active = null
+            return WorkoutStopResult.Discarded(workout)
+        }
         val completed =
             workout.copy(
-                endedAtMillis = max(at.toEpochMilli(), workout.startedAtMillis + 1),
+                endedAtMillis = endMillis,
                 distanceMeters = calculatedDistance,
                 caloriesKcal = lastBikeEnergy?.let { calculatedEnergy },
                 state = WorkoutEntity.STATE_COMPLETE,
             )
         dao.upsertWorkout(completed)
         active = null
-        return completed
+        return WorkoutStopResult.Completed(completed)
     }
 
     fun activeId(): String? = active?.id
@@ -120,4 +127,16 @@ class WorkoutRecorder(
     suspend fun lastSampleTime(): Instant? = active?.id?.let { id ->
         dao.latestSampleTimestamp(id)?.let(Instant::ofEpochMilli)
     }
+
+    companion object {
+        const val MINIMUM_WORKOUT_DURATION_MILLIS = 10_000L
+    }
+}
+
+sealed interface WorkoutStopResult {
+    val workout: WorkoutEntity
+
+    data class Completed(override val workout: WorkoutEntity) : WorkoutStopResult
+
+    data class Discarded(override val workout: WorkoutEntity) : WorkoutStopResult
 }

@@ -37,7 +37,7 @@ class HealthConnectRecordMapper(
         fun metadata(suffix: String) = Metadata.activelyRecorded(
             device = device,
             clientRecordId = "${workout.id}:$suffix",
-            clientRecordVersion = 2,
+            clientRecordVersion = CLIENT_RECORD_VERSION,
         )
 
         val records = mutableListOf<Record>()
@@ -47,7 +47,7 @@ class HealthConnectRecordMapper(
                 startZoneOffset = startOffset,
                 endTime = end,
                 endZoneOffset = endOffset,
-                exerciseType = ExerciseSessionRecord.EXERCISE_TYPE_BIKING,
+                exerciseType = ExerciseSessionRecord.EXERCISE_TYPE_BIKING_STATIONARY,
                 title = title,
                 metadata = metadata("session"),
             )
@@ -140,5 +140,9 @@ class HealthConnectRecordMapper(
                 metadata = metadata("distance-$bucket"),
             )
         }
+    }
+
+    companion object {
+        const val CLIENT_RECORD_VERSION = 3L
     }
 }

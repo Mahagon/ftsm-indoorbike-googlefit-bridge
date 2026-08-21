@@ -10,7 +10,26 @@
     <string name="exercise_history">Trainingsverlauf</string><string name="loading_history">Verlauf wird geladen…</string><string name="no_workouts">Noch keine abgeschlossenen Trainings.</string><string name="load_more">Mehr laden</string><string name="workout_details">Trainingsdetails</string><string name="loading_workout">Training wird geladen…</string>
     <string name="started">Beginn</string><string name="ended">Ende</string><string name="target">Ziel</string><string name="target_result">Zielergebnis</string><string name="reached">Erreicht</string><string name="not_reached">Nicht erreicht</string><string name="detailed_metrics_unavailable">Für dieses Training sind keine detaillierten Messwerte verfügbar.</string>
     <string name="health_connect">Health Connect</string><string name="saved_health_connect">In Health Connect gespeichert</string><string name="save_failed">Speichern fehlgeschlagen</string><string name="save_pending">Speichern ausstehend</string><string name="retry_save">Erneut speichern</string>
-    <string name="health_google_hint">Fahrten werden als Radfahren exportiert, damit Google Health ihre Distanz anzeigen kann. Google Health benötigt in Health Connect Lesezugriff auf Training und Distanz. Falls Daten fehlen, öffne Google Health → Verbindungen → Partner-Apps und synchronisiere Health Connect.</string>
+    <string name="health_google_hint">Fahrten werden als stationäres Radfahren mit echten Trainings- und Distanzeinträgen gespeichert. Google Health zeigt die Distanz oder das Training möglicherweise nicht im Dashboard an, obwohl Health Connect die Daten bestätigt.</string>
+    <string name="verify_health_connect">Health Connect prüfen</string>
+    <string name="verifying_health_connect">Prüfung läuft…</string>
+    <string name="health_connect_verified">Health-Connect-Daten bestätigt</string>
+    <string name="health_connect_mismatch">Abweichung in Health Connect</string>
+    <string name="health_connect_verification_failed">Prüfung fehlgeschlagen: %1$s</string>
+    <string name="health_session_records">Trainingseinträge</string>
+    <string name="health_exercise_type">Trainingstyp</string>
+    <string name="health_record_version">Eintragsversion</string>
+    <string name="health_distance_records">Distanzeinträge</string>
+    <string name="health_distance_comparison">Gespeichert / erwartet</string>
+    <string name="health_issue_session_missing">Trainingseintrag fehlt</string>
+    <string name="health_issue_session_duplicated">Trainingseintrag ist doppelt</string>
+    <string name="health_issue_session_type">Trainingstyp ist nicht stationäres Radfahren</string>
+    <string name="health_issue_session_interval">Trainingszeitraum weicht ab</string>
+    <string name="health_issue_session_version">Trainingsversion weicht ab</string>
+    <string name="health_issue_distance_missing">Distanzeinträge fehlen</string>
+    <string name="health_issue_distance_unexpected">Unerwartete Distanzeinträge vorhanden</string>
+    <string name="health_issue_distance_total">Gespeicherte Distanz weicht vom Training ab</string>
+    <string name="health_issue_distance_version">Version der Distanzeinträge weicht ab</string>
     <string name="training_retention">Aufbewahrung des Trainingsverlaufs</string><string name="retention_description">Die ältesten Trainings werden entfernt, nachdem sie in Health Connect gespeichert wurden. Aktive, ungespeicherte und das neueste abgeschlossene Training bleiben immer erhalten.</string><string name="retain_hours">Trainingsverlauf aufbewahren (Stunden)</string><string name="retention_default">Standard: 36 Stunden, ungefähr 20 MiB. Zulässig: 1–10.000 Stunden.</string><string name="retention_large_warning">Diese Einstellung kann das empfohlene Cloud-Backup-Ziel von 20 MiB überschreiten.</string><string name="save_retention">Aufbewahrung speichern</string><string name="retention_saved">Aufbewahrung gespeichert. Die Bereinigung läuft im Hintergrund.</string><string name="current_storage">Aktueller Speicher</string><string name="training_hours_retained">%1$.1f Trainingsstunden aufbewahrt</string><string name="calculating">Wird berechnet…</string><string name="backup_explanation">Android sichert automatisch, wenn das Gerät die Voraussetzungen erfüllt. Das App-Backup ist auf 25 MB begrenzt; 20 MiB dienen hier als sichereres Warnziel.</string><string name="backup_warning">Backup-Speicherwarnung</string><string name="storage_used">%1$.1f MiB belegt</string>
     <string name="monitoring_channel">Bike-Hintergrundüberwachung</string><string name="stop_monitoring">Überwachung beenden</string><string name="recording_bike">%1$s wird aufgezeichnet</string><string name="connected_waiting">Verbunden · warte auf Fahrdaten</string><string name="waiting_bike">Warte auf %1$s</string><string name="bike">Bike</string><string name="monitoring_active">Hintergrundüberwachung aktiv</string>
     <string name="connection_not_connected">Nicht verbunden</string><string name="connection_scanning">Suche läuft…</string><string name="connection_connecting">Verbindung wird hergestellt…</string><string name="connection_ready">Bereit · %1$s</string><string name="connection_recording">Aufzeichnung · %1$s</string><string name="connection_saving">Training wird gespeichert…</string><string name="connection_problem">Verbindungsproblem</string>
