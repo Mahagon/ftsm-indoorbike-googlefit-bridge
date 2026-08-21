@@ -76,9 +76,13 @@ class WorkoutDaoTest {
     }
 
     @Test
-    fun `migration from version one preserves workouts and samples`() = runTest {
+    fun `migrations requeue completed workouts and preserve active workouts`() = runTest {
+        (1..3).forEach { version -> verifyMigrationFrom(version) }
+    }
+
+    private suspend fun verifyMigrationFrom(version: Int) {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val name = "workout-migration-${System.nanoTime()}.db"
+        val name = "workout-migration-$version-${System.nanoTime()}.db"
         context.openOrCreateDatabase(name, Context.MODE_PRIVATE, null).use { sqlite ->
             sqlite.execSQL(
                 """
@@ -108,13 +112,32 @@ class WorkoutDaoTest {
                 """.trimIndent(),
             )
             sqlite.execSQL("CREATE INDEX index_samples_workoutId ON samples(workoutId)")
-            sqlite.execSQL("INSERT INTO workouts VALUES ('old-ride', 1000, 4000, 25.0, 'COMPLETE', 1, NULL)")
-            sqlite.execSQL("INSERT INTO samples VALUES ('old-ride', 2000, 20.0, 80.0, 150, 10)")
-            sqlite.version = 1
+            if (version >= 2) {
+                sqlite.execSQL("ALTER TABLE workouts ADD COLUMN targetDurationSeconds INTEGER")
+                sqlite.execSQL("ALTER TABLE workouts ADD COLUMN targetDistanceMeters REAL")
+            }
+            if (version >= 3) {
+                sqlite.execSQL("ALTER TABLE workouts ADD COLUMN caloriesKcal REAL")
+                sqlite.execSQL("ALTER TABLE samples ADD COLUMN sessionDistanceMeters REAL")
+                sqlite.execSQL("ALTER TABLE samples ADD COLUMN bikeEnergyKcal INTEGER")
+                sqlite.execSQL("ALTER TABLE samples ADD COLUMN sessionEnergyKcal REAL")
+            }
+            val extraColumns = if (version == 1) {
+                ""
+            } else if (version == 2) {
+                ", NULL, NULL"
+            } else {
+                ", NULL, NULL, NULL"
+            }
+            sqlite.execSQL("INSERT INTO workouts VALUES ('old-ride', 1000, 4000, 25.0, 'COMPLETE', 1, NULL$extraColumns)")
+            sqlite.execSQL("INSERT INTO workouts VALUES ('active-ride', 5000, NULL, 5.0, 'ACTIVE', 1, 'keep'$extraColumns)")
+            val sampleExtraColumns = if (version >= 3) ", NULL, NULL, NULL" else ""
+            sqlite.execSQL("INSERT INTO samples VALUES ('old-ride', 2000, 20.0, 80.0, 150, 10$sampleExtraColumns)")
+            sqlite.version = version
         }
 
         val migrated = Room.databaseBuilder(context, BridgeDatabase::class.java, name)
-            .addMigrations(BridgeDatabase.MIGRATION_1_2, BridgeDatabase.MIGRATION_2_3)
+            .addMigrations(BridgeDatabase.MIGRATION_1_2, BridgeDatabase.MIGRATION_2_3, BridgeDatabase.MIGRATION_3_4)
             .allowMainThreadQueries()
             .build()
         try {
@@ -122,6 +145,11 @@ class WorkoutDaoTest {
             assertEquals(1, stored.samples.size)
             assertEquals(null, stored.workout.targetDurationSeconds)
             assertEquals(null, stored.workout.targetDistanceMeters)
+            assertEquals(false, stored.workout.synced)
+            assertEquals(null, stored.workout.syncError)
+            val active = requireNotNull(migrated.workouts().workout("active-ride")).workout
+            assertEquals(true, active.synced)
+            assertEquals("keep", active.syncError)
         } finally {
             migrated.close()
             context.deleteDatabase(name)

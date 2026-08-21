@@ -37,7 +37,7 @@ class HealthConnectRecordMapper(
         fun metadata(suffix: String) = Metadata.activelyRecorded(
             device = device,
             clientRecordId = "${workout.id}:$suffix",
-            clientRecordVersion = 1,
+            clientRecordVersion = 2,
         )
 
         val records = mutableListOf<Record>()
@@ -47,7 +47,7 @@ class HealthConnectRecordMapper(
                 startZoneOffset = startOffset,
                 endTime = end,
                 endZoneOffset = endOffset,
-                exerciseType = ExerciseSessionRecord.EXERCISE_TYPE_BIKING_STATIONARY,
+                exerciseType = ExerciseSessionRecord.EXERCISE_TYPE_BIKING,
                 title = title,
                 metadata = metadata("session"),
             )

@@ -117,6 +117,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         TrainingRetentionManager.schedule(this)
+        app.controller.retryHealthSync()
         setContent {
             FtmsBridgeTheme {
                 val state by app.controller.state.collectAsStateWithLifecycle()
