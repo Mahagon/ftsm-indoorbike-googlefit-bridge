@@ -27,6 +27,7 @@ import dev.frakw.ftmsbridge.R
 import dev.frakw.ftmsbridge.data.WorkoutEntity
 import dev.frakw.ftmsbridge.data.target
 import dev.frakw.ftmsbridge.formatTarget
+import dev.frakw.ftmsbridge.health.HealthConnectVerificationIssue
 import dev.frakw.ftmsbridge.targetReached
 import java.time.Duration
 import java.time.Instant
@@ -54,7 +55,8 @@ fun WorkoutDetailRoute(
 ) {
     val detailsFlow = remember(workoutId) { viewModel.details(workoutId) }
     val details by detailsFlow.collectAsStateWithLifecycle(initialValue = null)
-    WorkoutDetailScreen(details, onBack, onRetrySync)
+    val verification by viewModel.healthVerification.collectAsStateWithLifecycle()
+    WorkoutDetailScreen(details, verification, onBack, onRetrySync) { viewModel.verifyHealthConnect(workoutId) }
 }
 
 @Composable
@@ -97,8 +99,10 @@ private fun HistoryScreen(
 @Composable
 private fun WorkoutDetailScreen(
     details: WorkoutDetails?,
+    verification: HealthVerificationState,
     onBack: () -> Unit,
     onRetrySync: () -> Unit,
+    onVerifyHealthConnect: () -> Unit,
 ) {
     val locale = Locale.forLanguageTag(LocalLocale.current.toLanguageTag())
     Scaffold { padding ->
@@ -154,6 +158,21 @@ private fun WorkoutDetailScreen(
                             if (!workout.synced) {
                                 Button(onClick = onRetrySync) { Text(stringResource(R.string.retry_save)) }
                             }
+                            Button(
+                                onClick = onVerifyHealthConnect,
+                                enabled = verification !is HealthVerificationState.Loading,
+                            ) {
+                                Text(
+                                    stringResource(
+                                        if (verification is HealthVerificationState.Loading) {
+                                            R.string.verifying_health_connect
+                                        } else {
+                                            R.string.verify_health_connect
+                                        },
+                                    ),
+                                )
+                            }
+                            HealthVerificationResult(workout.id, verification)
                             Text(stringResource(R.string.health_google_hint), style = MaterialTheme.typography.bodySmall)
                         }
                     }
@@ -161,6 +180,63 @@ private fun WorkoutDetailScreen(
             }
         }
     }
+}
+
+@Composable
+private fun HealthVerificationResult(
+    workoutId: String,
+    state: HealthVerificationState,
+) {
+    val locale = Locale.forLanguageTag(LocalLocale.current.toLanguageTag())
+    when (state) {
+        is HealthVerificationState.Result -> if (state.workoutId == workoutId) {
+            val result = state.verification
+            Text(
+                stringResource(
+                    if (result.verified) R.string.health_connect_verified else R.string.health_connect_mismatch,
+                ),
+                color = if (result.verified) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+            )
+            DetailRow(stringResource(R.string.health_session_records), result.sessionCount.toString())
+            DetailRow(stringResource(R.string.health_exercise_type), result.exerciseType?.toString() ?: "—")
+            DetailRow(stringResource(R.string.health_record_version), result.sessionVersion?.toString() ?: "—")
+            DetailRow(stringResource(R.string.health_distance_records), result.distanceRecordCount.toString())
+            DetailRow(
+                stringResource(R.string.health_distance_comparison),
+                String.format(
+                    locale,
+                    "%.2f / %.2f km",
+                    result.storedDistanceMeters / 1_000.0,
+                    result.expectedDistanceMeters / 1_000.0,
+                ),
+            )
+            if (result.issues.isNotEmpty()) {
+                result.issues.forEach { issue ->
+                    Text(stringResource(issue.labelResource()), color = MaterialTheme.colorScheme.error)
+                }
+            }
+        }
+
+        is HealthVerificationState.Error -> if (state.workoutId == workoutId) {
+            Text(stringResource(R.string.health_connect_verification_failed, state.message), color = MaterialTheme.colorScheme.error)
+        }
+
+        HealthVerificationState.Idle,
+        is HealthVerificationState.Loading,
+        -> Unit
+    }
+}
+
+private fun HealthConnectVerificationIssue.labelResource(): Int = when (this) {
+    HealthConnectVerificationIssue.SESSION_MISSING -> R.string.health_issue_session_missing
+    HealthConnectVerificationIssue.SESSION_DUPLICATED -> R.string.health_issue_session_duplicated
+    HealthConnectVerificationIssue.SESSION_TYPE_MISMATCH -> R.string.health_issue_session_type
+    HealthConnectVerificationIssue.SESSION_INTERVAL_MISMATCH -> R.string.health_issue_session_interval
+    HealthConnectVerificationIssue.SESSION_VERSION_MISMATCH -> R.string.health_issue_session_version
+    HealthConnectVerificationIssue.DISTANCE_MISSING -> R.string.health_issue_distance_missing
+    HealthConnectVerificationIssue.DISTANCE_UNEXPECTED -> R.string.health_issue_distance_unexpected
+    HealthConnectVerificationIssue.DISTANCE_TOTAL_MISMATCH -> R.string.health_issue_distance_total
+    HealthConnectVerificationIssue.DISTANCE_VERSION_MISMATCH -> R.string.health_issue_distance_version
 }
 
 @Composable

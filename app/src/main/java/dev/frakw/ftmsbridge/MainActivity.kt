@@ -121,7 +121,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             FtmsBridgeTheme {
                 val state by app.controller.state.collectAsStateWithLifecycle()
-                val historyViewModel = viewModel { HistoryViewModel(app.database.workouts()) }
+                val historyViewModel = viewModel { HistoryViewModel(app.database.workouts(), app.healthWriter) }
                 val retentionViewModel = viewModel { RetentionViewModel(app.retention) }
                 val retentionStatus by retentionViewModel.status.collectAsStateWithLifecycle()
                 val updater = viewModel { UpdateViewModel(application) }
