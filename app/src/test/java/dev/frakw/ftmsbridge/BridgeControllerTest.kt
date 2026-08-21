@@ -108,6 +108,10 @@ class BridgeControllerTest {
         advanceTimeBy(5_000)
         fixture.client.emit(ready(sample(BASE_TIME.plusSeconds(6))))
         runCurrent()
+        assertNull(fixture.controller.state.value.recordingId)
+
+        fixture.client.emit(ready(sample(BASE_TIME.plusSeconds(7), cadenceRpm = 81.0)))
+        runCurrent()
         assertNotNull(fixture.controller.state.value.recordingId)
         assertEquals(2, fixture.dao.workouts.size)
     }
@@ -249,7 +253,7 @@ class BridgeControllerTest {
     }
 
     @Test
-    fun `stationary packets stay suppressed until movement changes`() = runTest {
+    fun `cadence remains authoritative when power changes`() = runTest {
         val fixture = fixture(monitoringEnabled = true)
         runCurrent()
         fixture.client.emit(ready(sample(BASE_TIME)))
@@ -265,6 +269,10 @@ class BridgeControllerTest {
         advanceTimeBy(5_000)
         fixture.client.emit(ready(sample(BASE_TIME.plusSeconds(6), powerWatts = 151)))
         runCurrent()
+        assertNull(fixture.controller.state.value.recordingId)
+
+        fixture.client.emit(ready(sample(BASE_TIME.plusSeconds(7), cadenceRpm = 81.0, powerWatts = 151)))
+        runCurrent()
         assertNotNull(fixture.controller.state.value.recordingId)
         assertEquals(2, fixture.dao.workouts.size)
     }
@@ -279,14 +287,49 @@ class BridgeControllerTest {
         runCurrent()
 
         advanceTimeBy(4_999)
-        fixture.client.emit(ready(sample(BASE_TIME.plusMillis(4_999), powerWatts = 151)))
+        fixture.client.emit(ready(sample(BASE_TIME.plusMillis(4_999), cadenceRpm = 81.0, powerWatts = 151)))
         runCurrent()
         assertNull(fixture.controller.state.value.recordingId)
 
         advanceTimeBy(1)
-        fixture.client.emit(ready(sample(BASE_TIME.plusSeconds(5), powerWatts = 151)))
+        fixture.client.emit(ready(sample(BASE_TIME.plusSeconds(5), cadenceRpm = 81.0, powerWatts = 152)))
+        runCurrent()
+        assertNull(fixture.controller.state.value.recordingId)
+
+        fixture.client.emit(ready(sample(BASE_TIME.plusSeconds(6), cadenceRpm = 82.0, powerWatts = 152)))
         runCurrent()
         assertNotNull(fixture.controller.state.value.recordingId)
+    }
+
+    @Test
+    fun `cadence absent falls back to fresh positive power`() = runTest {
+        val fixture = fixture(monitoringEnabled = true)
+        runCurrent()
+        fixture.client.emit(ready(sample(BASE_TIME)))
+        runCurrent()
+        fixture.controller.stopWorkout()
+        runCurrent()
+
+        advanceTimeBy(4_999)
+        fixture.client.emit(ready(sample(BASE_TIME.plusMillis(4_999), cadenceRpm = null, speedKph = null, powerWatts = 150)))
+        runCurrent()
+        advanceTimeBy(1)
+        fixture.client.emit(ready(sample(BASE_TIME.plusSeconds(5), cadenceRpm = null, speedKph = null, powerWatts = 151)))
+        runCurrent()
+
+        assertNotNull(fixture.controller.state.value.recordingId)
+    }
+
+    @Test
+    fun `zero cadence prevents speed and power fallback`() = runTest {
+        val fixture = fixture(monitoringEnabled = true)
+        runCurrent()
+
+        fixture.client.emit(ready(sample(BASE_TIME, cadenceRpm = 0.0)))
+        runCurrent()
+
+        assertNull(fixture.controller.state.value.recordingId)
+        assertTrue(fixture.dao.workouts.isEmpty())
     }
 
     @Test
@@ -384,9 +427,12 @@ class BridgeControllerTest {
 
     private fun sample(
         at: Instant,
-        powerWatts: Int = 150,
+        speedKph: Double? = 25.0,
+        cadenceRpm: Double? = 80.0,
+        powerWatts: Int? = 150,
+        totalDistanceMeters: Long? = null,
         elapsedTimeSeconds: Int? = null,
-    ) = IndoorBikeSample(at, 25.0, 80.0, powerWatts, null, elapsedTimeSeconds)
+    ) = IndoorBikeSample(at, speedKph, cadenceRpm, powerWatts, totalDistanceMeters, elapsedTimeSeconds)
 
     private data class Fixture(
         val controller: BridgeController,

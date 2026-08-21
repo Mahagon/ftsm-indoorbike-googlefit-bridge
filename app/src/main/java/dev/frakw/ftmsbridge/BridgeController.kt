@@ -51,6 +51,7 @@ class BridgeController internal constructor(
     private var inactivityJob: Job? = null
     private var retryJob: Job? = null
     private var automaticStartBlockedUntil: Instant? = null
+    private var automaticStartNeedsBaseline = false
 
     constructor(
         context: Context,
@@ -98,6 +99,7 @@ class BridgeController internal constructor(
 
                 if (ftms.connection in setOf(ConnectionState.DISCONNECTED, ConnectionState.ERROR)) {
                     if (previousConnection in setOf(ConnectionState.READY, ConnectionState.RECORDING)) {
+                        if (automaticStartBlockedUntil != null) automaticStartNeedsBaseline = true
                         lastMovementMetrics = null
                         lastMovementAt = null
                     }
@@ -186,19 +188,30 @@ class BridgeController internal constructor(
             lastMeasurementAt = sample.timestamp
             val movementMetrics = MovementMetrics.from(sample)
             val automaticStartBlocked = automaticStartBlockedUntil?.let { clock.instant().isBefore(it) } == true
-            if (recorder.activeId() == null && mutableState.value.monitoringEnabled && automaticStartBlocked) {
-                lastMovementMetrics = null
+            if (
+                recorder.activeId() == null &&
+                mutableState.value.monitoringEnabled &&
+                (automaticStartBlocked || automaticStartNeedsBaseline)
+            ) {
+                lastMovementMetrics = movementMetrics
                 lastMovementAt = null
+                automaticStartNeedsBaseline = false
                 return
             }
-            val movementChanged = movementMetrics != lastMovementMetrics
+            val previousMovementMetrics = lastMovementMetrics
+            val movementChanged = movementMetrics != previousMovementMetrics
             if (movementChanged) {
                 lastMovementMetrics = movementMetrics
                 lastMovementAt = sample.timestamp
                 inactivityJob?.cancel()
                 inactivityJob = null
             }
-            if (movementChanged && mutableState.value.monitoringEnabled && recorder.activeId() == null) {
+            if (
+                movementChanged &&
+                mutableState.value.monitoringEnabled &&
+                recorder.activeId() == null &&
+                movementMetrics.isFreshActivityAfter(previousMovementMetrics)
+            ) {
                 startWorkoutLocked(sample.timestamp)
             }
             if (recorder.activeId() != null) {
@@ -215,6 +228,8 @@ class BridgeController internal constructor(
     }
 
     private suspend fun startWorkoutLocked(at: Instant = clock.instant()) {
+        automaticStartBlockedUntil = null
+        automaticStartNeedsBaseline = false
         val target = environment.pendingTarget()
         val workout = recorder.start(at, target)
         environment.setPendingTarget(null)
@@ -266,7 +281,7 @@ class BridgeController internal constructor(
         mutableState.update { it.copy(connection = ConnectionState.FINALIZING) }
         val result = recorder.stop(at)
         automaticStartBlockedUntil = clock.instant().plusMillis(automaticStartCooldownMillis)
-        lastMovementMetrics = null
+        automaticStartNeedsBaseline = client.state.value.connection != ConnectionState.READY
         lastMovementAt = null
         lastMeasurementAt = null
         mutableState.update {
@@ -311,6 +326,17 @@ class BridgeController internal constructor(
         val powerWatts: Int?,
         val totalDistanceMeters: Long?,
     ) {
+        fun isFreshActivityAfter(previous: MovementMetrics?): Boolean {
+            cadenceRpm?.let { cadence ->
+                return cadence > 0.0 && cadence != previous?.cadenceRpm
+            }
+            return speedKph?.let { it > 0.0 && it != previous?.speedKph } == true ||
+                powerWatts?.let { it > 0 && it != previous?.powerWatts } == true ||
+                totalDistanceMeters?.let { distance ->
+                    previous?.totalDistanceMeters?.let { distance > it } == true
+                } == true
+        }
+
         companion object {
             fun from(sample: IndoorBikeSample) = MovementMetrics(
                 sample.speedKph,
