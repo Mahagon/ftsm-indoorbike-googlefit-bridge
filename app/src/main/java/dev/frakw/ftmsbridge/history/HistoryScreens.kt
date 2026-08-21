@@ -1,11 +1,16 @@
 package dev.frakw.ftmsbridge.history
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -19,8 +24,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.frakw.ftmsbridge.R
@@ -136,9 +145,15 @@ private fun WorkoutDetailScreen(
                     }
                 }
                 if (details.hasSamples) {
-                    item { MetricCard(stringResource(R.string.speed), details.speedKph, "km/h") }
-                    item { MetricCard(stringResource(R.string.cadence), details.cadenceRpm, "rpm") }
-                    item { MetricCard(stringResource(R.string.power), details.powerWatts, "W") }
+                    item {
+                        MetricCard(stringResource(R.string.speed), details.speedKph, "km/h", workout.startedAtMillis, workout.endedAtMillis)
+                    }
+                    item {
+                        MetricCard(stringResource(R.string.cadence), details.cadenceRpm, "rpm", workout.startedAtMillis, workout.endedAtMillis)
+                    }
+                    item {
+                        MetricCard(stringResource(R.string.power), details.powerWatts, "W", workout.startedAtMillis, workout.endedAtMillis)
+                    }
                 } else {
                     item {
                         Card(Modifier.fillMaxWidth()) {
@@ -251,17 +266,84 @@ private fun ScreenHeader(title: String, onBack: () -> Unit) {
 }
 
 @Composable
-private fun MetricCard(label: String, summary: MetricSummary?, unit: String) {
+private fun MetricCard(
+    label: String,
+    series: MetricSeries?,
+    unit: String,
+    startedAtMillis: Long,
+    endedAtMillis: Long?,
+) {
     val locale = Locale.forLanguageTag(LocalLocale.current.toLanguageTag())
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(label, style = MaterialTheme.typography.titleMedium)
-            if (summary == null) {
+            if (series == null) {
                 Text(stringResource(R.string.no_data))
             } else {
-                DetailRow(stringResource(R.string.average), String.format(locale, "%.1f %s", summary.average, unit))
-                DetailRow(stringResource(R.string.maximum), String.format(locale, "%.1f %s", summary.maximum, unit))
+                DetailRow(stringResource(R.string.average), String.format(locale, "%.1f %s", series.average, unit))
+                DetailRow(stringResource(R.string.maximum), String.format(locale, "%.1f %s", series.maximum, unit))
+                MetricChart(
+                    series = series,
+                    unit = unit,
+                    startedAtMillis = startedAtMillis,
+                    endedAtMillis = endedAtMillis ?: series.points.last().timestampMillis,
+                )
             }
+        }
+    }
+}
+
+@Composable
+private fun MetricChart(
+    series: MetricSeries,
+    unit: String,
+    startedAtMillis: Long,
+    endedAtMillis: Long,
+    chartHeight: Dp = 140.dp,
+) {
+    val locale = Locale.forLanguageTag(LocalLocale.current.toLanguageTag())
+    val lineColor = MaterialTheme.colorScheme.primary
+    val gridColor = MaterialTheme.colorScheme.outlineVariant
+    val durationMillis = (endedAtMillis - startedAtMillis).coerceAtLeast(1L)
+    val scaleMaximum = series.maximum.coerceAtLeast(1.0)
+    Row(Modifier.fillMaxWidth().height(chartHeight)) {
+        Column(
+            modifier = Modifier.width(64.dp).fillMaxHeight().padding(end = 8.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+            horizontalAlignment = Alignment.End,
+        ) {
+            Text(String.format(locale, "%.1f %s", series.maximum, unit), style = MaterialTheme.typography.labelSmall)
+            Text(String.format(locale, "%.1f", 0.0), style = MaterialTheme.typography.labelSmall)
+        }
+        Canvas(Modifier.weight(1f).fillMaxHeight()) {
+            drawLine(gridColor, start = androidx.compose.ui.geometry.Offset(0f, 0f), end = androidx.compose.ui.geometry.Offset(size.width, 0f))
+            drawLine(
+                gridColor,
+                start = androidx.compose.ui.geometry.Offset(0f, size.height),
+                end = androidx.compose.ui.geometry.Offset(size.width, size.height),
+            )
+            fun offset(point: MetricPoint): androidx.compose.ui.geometry.Offset {
+                val x = ((point.timestampMillis - startedAtMillis).toDouble() / durationMillis).coerceIn(0.0, 1.0).toFloat() * size.width
+                val y = size.height - (point.value / scaleMaximum).coerceIn(0.0, 1.0).toFloat() * size.height
+                return androidx.compose.ui.geometry.Offset(x, y)
+            }
+            if (series.points.size == 1) {
+                drawCircle(lineColor, radius = 3.dp.toPx(), center = offset(series.points.single()))
+            } else {
+                val path = Path()
+                series.points.forEachIndexed { index, point ->
+                    val position = offset(point)
+                    if (index == 0) path.moveTo(position.x, position.y) else path.lineTo(position.x, position.y)
+                }
+                drawPath(path, lineColor, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
+            }
+        }
+    }
+    Row(Modifier.fillMaxWidth()) {
+        Spacer(Modifier.width(64.dp))
+        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(formatElapsed(0), style = MaterialTheme.typography.labelSmall)
+            Text(formatElapsed(durationMillis), style = MaterialTheme.typography.labelSmall)
         }
     }
 }
@@ -299,6 +381,16 @@ internal fun formatDuration(workout: WorkoutEntity): String {
     val end = workout.endedAtMillis ?: return "—"
     val seconds = Duration.ofMillis((end - workout.startedAtMillis).coerceAtLeast(0)).seconds
     return "%02d:%02d:%02d".format(seconds / 3600, seconds / 60 % 60, seconds % 60)
+}
+
+internal fun formatElapsed(millis: Long): String {
+    val seconds = (millis.coerceAtLeast(0) / 1_000)
+    val hours = seconds / 3_600
+    return if (hours > 0) {
+        "%d:%02d:%02d".format(hours, seconds / 60 % 60, seconds % 60)
+    } else {
+        "%02d:%02d".format(seconds / 60, seconds % 60)
+    }
 }
 
 private fun formatDistance(meters: Double) = String.format(Locale.getDefault(), "%.2f km", meters / 1000.0)

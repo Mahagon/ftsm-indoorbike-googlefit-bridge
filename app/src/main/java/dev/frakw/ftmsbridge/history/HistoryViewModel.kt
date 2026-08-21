@@ -2,6 +2,7 @@ package dev.frakw.ftmsbridge.history
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.frakw.ftmsbridge.data.SampleEntity
 import dev.frakw.ftmsbridge.data.WorkoutDao
 import dev.frakw.ftmsbridge.data.WorkoutEntity
 import dev.frakw.ftmsbridge.data.WorkoutWithSamples
@@ -26,28 +27,69 @@ data class WorkoutPage(
 
 internal fun List<WorkoutEntity>.toPage(limit: Int) = WorkoutPage(take(limit), size > limit, isLoading = false)
 
-data class MetricSummary(
+data class MetricPoint(
+    val timestampMillis: Long,
+    val value: Double,
+)
+
+data class MetricSeries(
     val average: Double,
     val maximum: Double,
+    val points: List<MetricPoint>,
 )
 
 data class WorkoutDetails(
     val workout: WorkoutEntity,
     val hasSamples: Boolean,
-    val speedKph: MetricSummary?,
-    val cadenceRpm: MetricSummary?,
-    val powerWatts: MetricSummary?,
+    val speedKph: MetricSeries?,
+    val cadenceRpm: MetricSeries?,
+    val powerWatts: MetricSeries?,
 )
 
-internal fun WorkoutWithSamples.toDetails(): WorkoutDetails = WorkoutDetails(
-    workout = workout,
-    hasSamples = samples.isNotEmpty(),
-    speedKph = samples.mapNotNull { it.speedKph }.summary(),
-    cadenceRpm = samples.mapNotNull { it.cadenceRpm }.summary(),
-    powerWatts = samples.mapNotNull { it.powerWatts?.toDouble() }.summary(),
-)
+internal fun WorkoutWithSamples.toDetails(): WorkoutDetails {
+    val ordered = samples.sortedBy { it.timestampMillis }
+    return WorkoutDetails(
+        workout = workout,
+        hasSamples = samples.isNotEmpty(),
+        speedKph = ordered.toMetricSeries { it.speedKph },
+        cadenceRpm = ordered.toMetricSeries { it.cadenceRpm },
+        powerWatts = ordered.toMetricSeries { it.powerWatts?.toDouble() },
+    )
+}
 
-private fun List<Double>.summary(): MetricSummary? = if (isEmpty()) null else MetricSummary(average(), max())
+private fun List<SampleEntity>.toMetricSeries(
+    value: (SampleEntity) -> Double?,
+): MetricSeries? {
+    val allPoints = mapNotNull { sample ->
+        value(sample)?.let { MetricPoint(sample.timestampMillis, it) }
+    }
+    if (allPoints.isEmpty()) return null
+    return MetricSeries(
+        average = allPoints.map { it.value }.average(),
+        maximum = allPoints.maxOf { it.value },
+        points = allPoints.downsample(MAX_CHART_POINTS),
+    )
+}
+
+internal fun List<MetricPoint>.downsample(maxPoints: Int): List<MetricPoint> {
+    require(maxPoints >= 4)
+    if (size <= maxPoints) return this
+    val interior = subList(1, lastIndex)
+    val bucketCount = (maxPoints - 2) / 2
+    val bucketSize = (interior.size + bucketCount - 1) / bucketCount
+    val reduced = interior.chunked(bucketSize).flatMap { bucket ->
+        val minimum = bucket.minBy { it.value }
+        val maximum = bucket.maxBy { it.value }
+        if (minimum === maximum) listOf(minimum) else listOf(minimum, maximum).sortedBy { it.timestampMillis }
+    }
+    return buildList {
+        add(this@downsample.first())
+        addAll(reduced)
+        add(this@downsample.last())
+    }
+}
+
+internal const val MAX_CHART_POINTS = 600
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HistoryViewModel(

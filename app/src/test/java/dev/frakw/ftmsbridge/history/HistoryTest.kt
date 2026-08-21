@@ -24,8 +24,8 @@ class HistoryTest {
         val value = WorkoutWithSamples(
             workout("ride", 1),
             listOf(
-                SampleEntity("ride", 2, 20.0, null, 100, null),
                 SampleEntity("ride", 3, 30.0, 80.0, 200, null),
+                SampleEntity("ride", 2, 20.0, null, 100, null),
             ),
         ).toDetails()
 
@@ -33,7 +33,38 @@ class HistoryTest {
         assertEquals(30.0, value.speedKph?.maximum ?: 0.0, 0.001)
         assertEquals(80.0, value.cadenceRpm?.average ?: 0.0, 0.001)
         assertEquals(150.0, value.powerWatts?.average ?: 0.0, 0.001)
+        assertEquals(listOf(2L, 3L), value.speedKph?.points?.map { it.timestampMillis })
         assertTrue(value.hasSamples)
+    }
+
+    @Test
+    fun `chart downsampling preserves endpoints and extrema`() {
+        val points = (0L until 1_000L).map { timestamp ->
+            MetricPoint(
+                timestampMillis = timestamp,
+                value = when (timestamp) {
+                    500L -> 10_000.0
+                    501L -> -100.0
+                    else -> timestamp.toDouble()
+                },
+            )
+        }
+
+        val reduced = points.downsample(MAX_CHART_POINTS)
+
+        assertTrue(reduced.size <= MAX_CHART_POINTS)
+        assertEquals(points.first(), reduced.first())
+        assertEquals(points.last(), reduced.last())
+        assertTrue(reduced.any { it.value == 10_000.0 })
+        assertTrue(reduced.any { it.value == -100.0 })
+        assertEquals(reduced.sortedBy { it.timestampMillis }, reduced)
+    }
+
+    @Test
+    fun `elapsed chart labels support minutes and hours`() {
+        assertEquals("00:00", formatElapsed(0))
+        assertEquals("05:07", formatElapsed(307_000))
+        assertEquals("1:02:03", formatElapsed(3_723_000))
     }
 
     @Test
