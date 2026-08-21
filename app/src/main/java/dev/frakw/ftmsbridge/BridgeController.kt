@@ -8,6 +8,7 @@ import dev.frakw.ftmsbridge.model.ConnectionState
 import dev.frakw.ftmsbridge.model.IndoorBikeSample
 import dev.frakw.ftmsbridge.model.WorkoutTarget
 import dev.frakw.ftmsbridge.recording.WorkoutRecorder
+import dev.frakw.ftmsbridge.recording.WorkoutStopResult
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -33,6 +34,7 @@ class BridgeController internal constructor(
     private val clock: Clock = Clock.systemUTC(),
     private val inactivityMillis: Long = INACTIVITY_MILLIS,
     private val retryMillis: Long = RETRY_MILLIS,
+    private val automaticStartCooldownMillis: Long = AUTOMATIC_START_COOLDOWN_MILLIS,
 ) {
     private val mutableState = MutableStateFlow(
         BridgeState(
@@ -48,7 +50,7 @@ class BridgeController internal constructor(
     private var lastMovementMetrics: MovementMetrics? = null
     private var inactivityJob: Job? = null
     private var retryJob: Job? = null
-    private var autoStartSuppressed = false
+    private var automaticStartBlockedUntil: Instant? = null
 
     constructor(
         context: Context,
@@ -96,7 +98,6 @@ class BridgeController internal constructor(
 
                 if (ftms.connection in setOf(ConnectionState.DISCONNECTED, ConnectionState.ERROR)) {
                     if (previousConnection in setOf(ConnectionState.READY, ConnectionState.RECORDING)) {
-                        autoStartSuppressed = false
                         lastMovementMetrics = null
                         lastMovementAt = null
                     }
@@ -164,7 +165,6 @@ class BridgeController internal constructor(
     fun stopWorkout() {
         scope.launch {
             workoutMutex.withLock {
-                autoStartSuppressed = mutableState.value.monitoringEnabled
                 finishActiveWorkout(lastMeasurementAt ?: clock.instant())
             }
             if (!mutableState.value.monitoringEnabled) environment.stopRecordingService()
@@ -185,15 +185,20 @@ class BridgeController internal constructor(
             lastSampleMillis = sample.timestamp.toEpochMilli()
             lastMeasurementAt = sample.timestamp
             val movementMetrics = MovementMetrics.from(sample)
+            val automaticStartBlocked = automaticStartBlockedUntil?.let { clock.instant().isBefore(it) } == true
+            if (recorder.activeId() == null && mutableState.value.monitoringEnabled && automaticStartBlocked) {
+                lastMovementMetrics = null
+                lastMovementAt = null
+                return
+            }
             val movementChanged = movementMetrics != lastMovementMetrics
             if (movementChanged) {
                 lastMovementMetrics = movementMetrics
                 lastMovementAt = sample.timestamp
                 inactivityJob?.cancel()
                 inactivityJob = null
-                if (autoStartSuppressed) autoStartSuppressed = false
             }
-            if (movementChanged && mutableState.value.monitoringEnabled && recorder.activeId() == null && !autoStartSuppressed) {
+            if (movementChanged && mutableState.value.monitoringEnabled && recorder.activeId() == null) {
                 startWorkoutLocked(sample.timestamp)
             }
             if (recorder.activeId() != null) {
@@ -233,7 +238,6 @@ class BridgeController internal constructor(
                 delay(inactivityMillis)
                 inactivityJob = null
                 workoutMutex.withLock {
-                    autoStartSuppressed = mutableState.value.monitoringEnabled
                     finishActiveWorkout(lastMovement)
                 }
             }
@@ -260,16 +264,24 @@ class BridgeController internal constructor(
         inactivityJob?.cancel()
         inactivityJob = null
         mutableState.update { it.copy(connection = ConnectionState.FINALIZING) }
-        val completed = recorder.stop(at)
+        val result = recorder.stop(at)
+        automaticStartBlockedUntil = clock.instant().plusMillis(automaticStartCooldownMillis)
+        lastMovementMetrics = null
+        lastMovementAt = null
+        lastMeasurementAt = null
         mutableState.update {
             it.copy(
                 connection = displayConnection(client.state.value.connection, false),
                 recordingId = null,
                 startedAt = null,
-                target = null,
+                target = (result as? WorkoutStopResult.Discarded)?.workout?.target(),
             )
         }
-        if (completed != null) environment.enqueueHealthSync()
+        when (result) {
+            is WorkoutStopResult.Completed -> environment.enqueueHealthSync()
+            is WorkoutStopResult.Discarded -> environment.setPendingTarget(result.workout.target())
+            null -> Unit
+        }
     }
 
     private fun enqueueHealthSync() = environment.enqueueHealthSync()
@@ -288,6 +300,7 @@ class BridgeController internal constructor(
     companion object {
         private const val INACTIVITY_MILLIS = 30_000L
         private const val RETRY_MILLIS = 10_000L
+        private const val AUTOMATIC_START_COOLDOWN_MILLIS = 5_000L
 
         fun isMonitoringEnabled(context: Context): Boolean = AndroidBridgeEnvironment(context).isMonitoringEnabled()
     }

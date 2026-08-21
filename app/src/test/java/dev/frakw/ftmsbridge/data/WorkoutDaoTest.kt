@@ -76,6 +76,15 @@ class WorkoutDaoTest {
     }
 
     @Test
+    fun `deleting an active workout cascades to its samples`() = runTest {
+        dao.upsertWorkout(WorkoutEntity(id = "short-ride", startedAtMillis = 1_000))
+        dao.upsertSample(SampleEntity("short-ride", 1_500, 20.0, 80.0, 150, 10))
+
+        assertEquals(1, dao.deleteActiveWorkout("short-ride"))
+        assertEquals(null, dao.workout("short-ride"))
+    }
+
+    @Test
     fun `migrations requeue completed workouts and preserve active workouts`() = runTest {
         (1..3).forEach { version -> verifyMigrationFrom(version) }
     }

@@ -105,7 +105,8 @@ class BridgeControllerTest {
 
         fixture.client.emit(FtmsClientState(connection = ConnectionState.DISCONNECTED))
         runCurrent()
-        fixture.client.emit(ready(sample(BASE_TIME.plusSeconds(2))))
+        advanceTimeBy(5_000)
+        fixture.client.emit(ready(sample(BASE_TIME.plusSeconds(6))))
         runCurrent()
         assertNotNull(fixture.controller.state.value.recordingId)
         assertEquals(2, fixture.dao.workouts.size)
@@ -261,10 +262,76 @@ class BridgeControllerTest {
         assertNull(fixture.controller.state.value.recordingId)
         assertEquals(1, fixture.dao.workouts.size)
 
-        fixture.client.emit(ready(sample(BASE_TIME.plusSeconds(2), powerWatts = 151)))
+        advanceTimeBy(5_000)
+        fixture.client.emit(ready(sample(BASE_TIME.plusSeconds(6), powerWatts = 151)))
         runCurrent()
         assertNotNull(fixture.controller.state.value.recordingId)
         assertEquals(2, fixture.dao.workouts.size)
+    }
+
+    @Test
+    fun `automatic recording waits five seconds after finish`() = runTest {
+        val fixture = fixture(monitoringEnabled = true)
+        runCurrent()
+        fixture.client.emit(ready(sample(BASE_TIME)))
+        runCurrent()
+        fixture.controller.stopWorkout()
+        runCurrent()
+
+        advanceTimeBy(4_999)
+        fixture.client.emit(ready(sample(BASE_TIME.plusMillis(4_999), powerWatts = 151)))
+        runCurrent()
+        assertNull(fixture.controller.state.value.recordingId)
+
+        advanceTimeBy(1)
+        fixture.client.emit(ready(sample(BASE_TIME.plusSeconds(5), powerWatts = 151)))
+        runCurrent()
+        assertNotNull(fixture.controller.state.value.recordingId)
+    }
+
+    @Test
+    fun `manual start bypasses automatic cooldown`() = runTest {
+        val fixture = fixture(monitoringEnabled = true)
+        runCurrent()
+        fixture.client.emit(ready(sample(BASE_TIME)))
+        runCurrent()
+        fixture.controller.stopWorkout()
+        runCurrent()
+
+        fixture.controller.startWorkout()
+        runCurrent()
+        assertNotNull(fixture.controller.state.value.recordingId)
+    }
+
+    @Test
+    fun `short workout is discarded without sync and restores target`() = runTest {
+        val target = WorkoutTarget.Duration(600)
+        val fixture = fixture(pendingTarget = target, minimumWorkoutDurationMillis = 10_000)
+        runCurrent()
+        fixture.controller.startWorkout()
+        runCurrent()
+        advanceTimeBy(9_999)
+        fixture.controller.stopWorkout()
+        runCurrent()
+
+        assertTrue(fixture.dao.workouts.isEmpty())
+        assertEquals(0, fixture.environment.healthSyncRequests)
+        assertEquals(target, fixture.environment.pendingTarget())
+        assertEquals(target, fixture.controller.state.value.target)
+    }
+
+    @Test
+    fun `ten second workout is retained and synced`() = runTest {
+        val fixture = fixture(minimumWorkoutDurationMillis = 10_000)
+        runCurrent()
+        fixture.controller.startWorkout()
+        runCurrent()
+        advanceTimeBy(10_000)
+        fixture.controller.stopWorkout()
+        runCurrent()
+
+        assertEquals(WorkoutEntity.STATE_COMPLETE, fixture.dao.workouts.values.single().state)
+        assertEquals(1, fixture.environment.healthSyncRequests)
     }
 
     @Test
@@ -293,13 +360,14 @@ class BridgeControllerTest {
         lastBikeAddress: String? = null,
         pendingTarget: WorkoutTarget? = null,
         dao: FakeDao = FakeDao(),
+        minimumWorkoutDurationMillis: Long = 1,
     ): Fixture {
         val client = FakeFtmsClient()
         val environment = FakeEnvironment(monitoringEnabled, lastBikeAddress, pendingTarget)
         val controller =
             BridgeController(
                 client = client,
-                recorder = WorkoutRecorder(dao),
+                recorder = WorkoutRecorder(dao, minimumWorkoutDurationMillis),
                 environment = environment,
                 scope = backgroundScope,
                 clock = SchedulerClock(testScheduler, BASE_TIME),
@@ -429,6 +497,13 @@ class BridgeControllerTest {
 
         override suspend fun deleteCompletedWorkout(id: String): Int {
             val removed = workouts[id]?.takeIf { it.state == WorkoutEntity.STATE_COMPLETE } ?: return 0
+            workouts.remove(removed.id)
+            samples.entries.removeAll { it.value.workoutId == removed.id }
+            return 1
+        }
+
+        override suspend fun deleteActiveWorkout(id: String): Int {
+            val removed = workouts[id]?.takeIf { it.state == WorkoutEntity.STATE_ACTIVE } ?: return 0
             workouts.remove(removed.id)
             samples.entries.removeAll { it.value.workoutId == removed.id }
             return 1

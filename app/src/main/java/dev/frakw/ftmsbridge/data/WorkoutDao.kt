@@ -35,6 +35,9 @@ interface WorkoutDao {
     @Query("DELETE FROM workouts WHERE id = :id AND state = 'COMPLETE'")
     suspend fun deleteCompletedWorkout(id: String): Int
 
+    @Query("DELETE FROM workouts WHERE id = :id AND state = 'ACTIVE'")
+    suspend fun deleteActiveWorkout(id: String): Int
+
     @Transaction
     @Query("SELECT * FROM workouts WHERE id = :id AND state = 'COMPLETE'")
     fun observeCompletedWorkout(id: String): Flow<WorkoutWithSamples?>

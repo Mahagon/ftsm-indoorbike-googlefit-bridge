@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 
@@ -17,7 +18,7 @@ class WorkoutRecorderTest {
     @Test
     fun `start persists selected target`() = runTest {
         val dao = FakeDao()
-        val recorder = WorkoutRecorder(dao)
+        val recorder = recorder(dao)
         val duration = recorder.start(Instant.EPOCH, WorkoutTarget.Duration(1_200))
         assertEquals(1_200L, duration.targetDurationSeconds)
         assertEquals(null, duration.targetDistanceMeters)
@@ -31,7 +32,7 @@ class WorkoutRecorderTest {
     @Test
     fun integratesSpeedWhenBikeDistanceIsMissing() = runTest {
         val dao = FakeDao()
-        val recorder = WorkoutRecorder(dao)
+        val recorder = recorder(dao)
         val start = Instant.parse("2026-08-18T12:00:00Z")
         recorder.start(start)
         recorder.accept(IndoorBikeSample(start, 36.0, 90.0, 200, null, null))
@@ -42,7 +43,7 @@ class WorkoutRecorderTest {
     @Test
     fun storesAtMostOneSamplePerSecond() = runTest {
         val dao = FakeDao()
-        val recorder = WorkoutRecorder(dao)
+        val recorder = recorder(dao)
         val start = Instant.parse("2026-08-18T12:00:00Z")
         recorder.start(start)
         recorder.accept(IndoorBikeSample(start, 20.0, null, null, null, null))
@@ -54,7 +55,7 @@ class WorkoutRecorderTest {
 
     @Test
     fun accumulatesBikeDistanceAcrossCounterReset() = runTest {
-        val recorder = WorkoutRecorder(FakeDao())
+        val recorder = recorder(FakeDao())
         val start = Instant.parse("2026-08-18T12:00:00Z")
         recorder.start(start)
         recorder.accept(IndoorBikeSample(start, null, null, null, 1_000, null))
@@ -69,7 +70,7 @@ class WorkoutRecorderTest {
         val dao = FakeDao()
         val start = Instant.parse("2026-08-18T12:00:00Z")
         dao.upsertWorkout(WorkoutEntity("restored", start.toEpochMilli(), distanceMeters = 42.0))
-        val recorder = WorkoutRecorder(dao)
+        val recorder = recorder(dao)
         assertNotNull(recorder.restore())
         assertEquals(42.0, recorder.distanceMeters(), 0.001)
     }
@@ -77,29 +78,55 @@ class WorkoutRecorderTest {
     @Test
     fun accumulatesReportedEnergyAcrossCounterReset() = runTest {
         val dao = FakeDao()
-        val recorder = WorkoutRecorder(dao)
+        val recorder = recorder(dao)
         val start = Instant.parse("2026-08-18T12:00:00Z")
         recorder.start(start)
         recorder.accept(IndoorBikeSample(start, null, null, null, null, null, 10))
         recorder.accept(IndoorBikeSample(start.plusSeconds(1), null, null, null, null, null, 14))
         recorder.accept(IndoorBikeSample(start.plusSeconds(2), null, null, null, null, null, 1))
-        val completed = recorder.stop(start.plusSeconds(3))
-        assertEquals(5.0, completed?.caloriesKcal ?: 0.0, 0.001)
+        val completed = (recorder.stop(start.plusSeconds(3)) as WorkoutStopResult.Completed).workout
+        assertEquals(5.0, completed.caloriesKcal ?: 0.0, 0.001)
     }
 
     @Test
     fun stopCompletesWorkoutAndKeepsDistance() = runTest {
         val dao = FakeDao()
-        val recorder = WorkoutRecorder(dao)
+        val recorder = recorder(dao)
         val start = Instant.parse("2026-08-18T12:00:00Z")
         recorder.start(start)
         recorder.accept(IndoorBikeSample(start, null, null, null, 500, null))
         recorder.accept(IndoorBikeSample(start.plusSeconds(1), null, null, null, 575, null))
-        val completed = recorder.stop(start)
-        assertEquals(WorkoutEntity.STATE_COMPLETE, completed?.state)
-        assertEquals(75.0, completed?.distanceMeters ?: 0.0, 0.001)
-        assertEquals(start.toEpochMilli() + 1, completed?.endedAtMillis)
+        val completed = (recorder.stop(start) as WorkoutStopResult.Completed).workout
+        assertEquals(WorkoutEntity.STATE_COMPLETE, completed.state)
+        assertEquals(75.0, completed.distanceMeters, 0.001)
+        assertEquals(start.toEpochMilli() + 1, completed.endedAtMillis)
     }
+
+    @Test
+    fun discardsWorkoutUnderTenSecondsAndItsSamples() = runTest {
+        val dao = FakeDao()
+        val recorder = WorkoutRecorder(dao)
+        val start = Instant.parse("2026-08-18T12:00:00Z")
+        recorder.start(start)
+        recorder.accept(IndoorBikeSample(start.plusSeconds(1), 20.0, null, null, null, null))
+
+        assertTrue(recorder.stop(start.plusMillis(9_999)) is WorkoutStopResult.Discarded)
+        assertTrue(dao.workouts.isEmpty())
+        assertTrue(dao.samples.isEmpty())
+    }
+
+    @Test
+    fun keepsWorkoutAtExactlyTenSeconds() = runTest {
+        val dao = FakeDao()
+        val recorder = WorkoutRecorder(dao)
+        val start = Instant.parse("2026-08-18T12:00:00Z")
+        recorder.start(start)
+
+        assertTrue(recorder.stop(start.plusSeconds(10)) is WorkoutStopResult.Completed)
+        assertEquals(WorkoutEntity.STATE_COMPLETE, dao.workouts.values.single().state)
+    }
+
+    private fun recorder(dao: FakeDao) = WorkoutRecorder(dao, minimumWorkoutDurationMillis = 1)
 
     private class FakeDao : WorkoutDao {
         val workouts = linkedMapOf<String, WorkoutEntity>()
@@ -129,6 +156,13 @@ class WorkoutRecorderTest {
 
         override suspend fun deleteCompletedWorkout(id: String): Int {
             val removed = workouts[id]?.takeIf { it.state == WorkoutEntity.STATE_COMPLETE } ?: return 0
+            workouts.remove(removed.id)
+            samples.entries.removeAll { it.value.workoutId == removed.id }
+            return 1
+        }
+
+        override suspend fun deleteActiveWorkout(id: String): Int {
+            val removed = workouts[id]?.takeIf { it.state == WorkoutEntity.STATE_ACTIVE } ?: return 0
             workouts.remove(removed.id)
             samples.entries.removeAll { it.value.workoutId == removed.id }
             return 1
