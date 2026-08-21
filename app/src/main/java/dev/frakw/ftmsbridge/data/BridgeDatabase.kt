@@ -8,7 +8,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import dev.frakw.ftmsbridge.retention.TrainingRetentionManager
 
-@Database(entities = [WorkoutEntity::class, SampleEntity::class], version = 3, exportSchema = false)
+@Database(entities = [WorkoutEntity::class, SampleEntity::class], version = 4, exportSchema = false)
 abstract class BridgeDatabase : RoomDatabase() {
     abstract fun workouts(): WorkoutDao
 
@@ -18,7 +18,7 @@ abstract class BridgeDatabase : RoomDatabase() {
                 context.applicationContext,
                 BridgeDatabase::class.java,
                 TrainingRetentionManager.DATABASE_NAME,
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
 
         internal val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -33,6 +33,12 @@ abstract class BridgeDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE samples ADD COLUMN sessionDistanceMeters REAL")
                 db.execSQL("ALTER TABLE samples ADD COLUMN bikeEnergyKcal INTEGER")
                 db.execSQL("ALTER TABLE samples ADD COLUMN sessionEnergyKcal REAL")
+            }
+        }
+
+        internal val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("UPDATE workouts SET synced = 0, syncError = NULL WHERE state = 'COMPLETE'")
             }
         }
     }

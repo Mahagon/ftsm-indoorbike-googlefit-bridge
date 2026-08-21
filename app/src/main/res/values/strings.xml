@@ -43,7 +43,7 @@
     <string name="save_failed">Save failed</string>
     <string name="save_pending">Waiting to save</string>
     <string name="retry_save">Retry save</string>
-    <string name="health_google_hint">Google Health must be allowed to read Exercise and Distance from Health Connect. If data is missing, open Google Health → Connections → Partner apps and sync Health Connect.</string>
+    <string name="health_google_hint">Rides are exported as biking so Google Health can display their distance. Google Health must be allowed to read Exercise and Distance from Health Connect. If data is missing, open Google Health → Connections → Partner apps and sync Health Connect.</string>
     <string name="training_retention">Training history retention</string>
     <string name="retention_description">Oldest workouts are removed after they have been saved to Health Connect. Active, unsaved, and the newest completed workout are always protected.</string>
     <string name="retain_hours">Retain training history (hours)</string>

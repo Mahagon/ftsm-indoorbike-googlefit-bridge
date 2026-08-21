@@ -55,6 +55,12 @@ class HealthConnectRecordMapperTest {
                 .single()
                 .metadata.clientRecordId,
         )
+        assertEquals(
+            ExerciseSessionRecord.EXERCISE_TYPE_BIKING,
+            records.filterIsInstance<ExerciseSessionRecord>().single().exerciseType,
+        )
+        assertTrue(records.all { it.metadata.clientRecordVersion == 2L })
+        assertEquals(records.size, records.map { it.metadata.clientRecordId }.distinct().size)
     }
 
     @Test
