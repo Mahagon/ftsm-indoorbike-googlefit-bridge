@@ -250,7 +250,6 @@ class MainActivity : ComponentActivity() {
                             onDismissUpdate = updater::dismiss,
                             onInstallUpdate = ::requestUpdateInstall,
                             onShareDiagnostics = { shareDiagnostics(state) },
-                            onFullscreen = { fullscreen = true },
                         )
                     }
                 }
@@ -336,7 +335,9 @@ class MainActivity : ComponentActivity() {
 
 internal fun shouldKeepScreenAwake(connection: ConnectionState): Boolean = connection == ConnectionState.READY || connection == ConnectionState.RECORDING
 
-internal fun canShowFullscreen(connection: ConnectionState): Boolean = connection == ConnectionState.READY || connection == ConnectionState.RECORDING
+internal fun canShowFullscreen(connection: ConnectionState): Boolean = connection == ConnectionState.RECORDING
+
+internal fun shouldShowStartWorkout(state: BridgeState): Boolean = state.connection == ConnectionState.READY && state.recordingId == null
 
 @Composable
 private fun BridgeScreen(
@@ -360,7 +361,6 @@ private fun BridgeScreen(
     onDismissUpdate: () -> Unit,
     onInstallUpdate: () -> Unit,
     onShareDiagnostics: () -> Unit,
-    onFullscreen: () -> Unit,
 ) {
     var diagnostics by remember { mutableStateOf(false) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -431,13 +431,6 @@ private fun BridgeScreen(
                 }
             }
             if (state.connection in setOf(ConnectionState.READY, ConnectionState.RECORDING, ConnectionState.FINALIZING)) {
-                if (canShowFullscreen(state.connection)) {
-                    item {
-                        OutlinedButton(onClick = onFullscreen, modifier = Modifier.fillMaxWidth()) {
-                            Text(stringResource(R.string.fullscreen_live))
-                        }
-                    }
-                }
                 item {
                     Metrics(
                         duration = state.startedAt?.let {
@@ -451,13 +444,11 @@ private fun BridgeScreen(
                     )
                 }
                 item {
-                    if (state.monitoringEnabled && state.recordingId == null) {
-                        Text(stringResource(R.string.automatic_recording))
-                    } else if (state.recordingId == null) {
+                    if (shouldShowStartWorkout(state)) {
                         Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
                             Text(stringResource(R.string.start_workout))
                         }
-                    } else {
+                    } else if (state.recordingId != null) {
                         Button(onClick = onStop, modifier = Modifier.fillMaxWidth()) {
                             Text(stringResource(if (state.monitoringEnabled) R.string.finish_now else R.string.stop_save))
                         }
@@ -513,10 +504,7 @@ private fun FullscreenMetricsScreen(
 
     BoxWithConstraints(Modifier.fillMaxSize().padding(12.dp)) {
         val landscape = maxWidth > maxHeight
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
+        Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -528,52 +516,27 @@ private fun FullscreenMetricsScreen(
                 }
                 TextButton(onClick = onExit) { Text(stringResource(R.string.exit_fullscreen)) }
             }
-            if (state.recordingId != null) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FullscreenMetric(metrics[0], Modifier.weight(1f))
-                    FullscreenMetric(metrics[4], Modifier.weight(1f))
+            val chartMetrics = listOf(
+                Triple(metrics[1], state.workoutMetrics.speedKph, "km/h"),
+                Triple(metrics[2], state.workoutMetrics.cadenceRpm, "rpm"),
+                Triple(metrics[3], state.workoutMetrics.powerWatts, "W"),
+            )
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                item {
+                    FullscreenSummaryCards(metrics, landscape)
                 }
-                val chartMetrics = listOf(
-                    Triple(metrics[1], state.workoutMetrics.speedKph, "km/h"),
-                    Triple(metrics[2], state.workoutMetrics.cadenceRpm, "rpm"),
-                    Triple(metrics[3], state.workoutMetrics.powerWatts, "W"),
-                )
-                if (landscape) {
-                    Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        chartMetrics.forEach { (metric, series, unit) ->
-                            LiveMetricChartCard(metric, series, unit, state.startedAt!!.toEpochMilli(), now, Modifier.weight(1f).fillMaxSize(), 100.dp)
-                        }
-                    }
-                } else {
-                    Column(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        chartMetrics.forEach { (metric, series, unit) ->
-                            LiveMetricChartCard(metric, series, unit, state.startedAt!!.toEpochMilli(), now, Modifier.weight(1f).fillMaxWidth(), 58.dp)
-                        }
-                    }
-                }
-            } else if (landscape) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    metrics.forEach { metric ->
-                        FullscreenMetric(metric, Modifier.weight(1f).fillMaxSize())
-                    }
-                }
-            } else {
-                Column(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FullscreenMetric(metrics[0], Modifier.weight(1f).fillMaxSize())
-                        FullscreenMetric(metrics[1], Modifier.weight(1f).fillMaxSize())
-                    }
-                    Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FullscreenMetric(metrics[2], Modifier.weight(1f).fillMaxSize())
-                        FullscreenMetric(metrics[3], Modifier.weight(1f).fillMaxSize())
-                    }
-                    FullscreenMetric(metrics[4], Modifier.fillMaxWidth().weight(1f))
+                items(chartMetrics) { (metric, series, unit) ->
+                    WorkoutGraphCard(
+                        metric = metric,
+                        series = series,
+                        unit = unit,
+                        startedAtMillis = state.startedAt?.toEpochMilli() ?: now,
+                        endedAtMillis = now,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
             if (state.recordingId != null) {
@@ -586,38 +549,55 @@ private fun FullscreenMetricsScreen(
 }
 
 @Composable
-private fun LiveMetricChartCard(
+private fun FullscreenSummaryCards(metrics: List<DashboardMetric>, landscape: Boolean) {
+    if (landscape) {
+        Row(Modifier.fillMaxWidth().height(150.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            metrics.forEach { metric -> FullscreenMetric(metric, Modifier.weight(1f).fillMaxSize()) }
+        }
+    } else {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth().height(130.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FullscreenMetric(metrics[0], Modifier.weight(1f).fillMaxSize())
+                FullscreenMetric(metrics[1], Modifier.weight(1f).fillMaxSize())
+            }
+            Row(Modifier.fillMaxWidth().height(130.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FullscreenMetric(metrics[2], Modifier.weight(1f).fillMaxSize())
+                FullscreenMetric(metrics[3], Modifier.weight(1f).fillMaxSize())
+            }
+            FullscreenMetric(metrics[4], Modifier.fillMaxWidth().height(130.dp))
+        }
+    }
+}
+
+@Composable
+private fun WorkoutGraphCard(
     metric: DashboardMetric,
     series: MetricSeries?,
     unit: String,
     startedAtMillis: Long,
     endedAtMillis: Long,
     modifier: Modifier,
-    chartHeight: androidx.compose.ui.unit.Dp,
 ) {
     val locale = Locale.forLanguageTag(LocalLocale.current.toLanguageTag())
     Card(modifier) {
-        Column(Modifier.fillMaxSize().padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(metric.label, style = MaterialTheme.typography.titleMedium)
             if (series == null) {
                 Text(stringResource(R.string.no_data), modifier = Modifier.align(Alignment.CenterHorizontally))
             } else {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    ChartStatistic(stringResource(R.string.current), metric.value)
-                    ChartStatistic(stringResource(R.string.average), String.format(locale, "%.1f %s", series.average, unit))
-                    ChartStatistic(stringResource(R.string.maximum), String.format(locale, "%.1f %s", series.maximum, unit))
-                }
-                MetricChart(series, unit, startedAtMillis, endedAtMillis, chartHeight)
+                GraphStatistic(stringResource(R.string.average), String.format(locale, "%.1f %s", series.average, unit))
+                GraphStatistic(stringResource(R.string.maximum), String.format(locale, "%.1f %s", series.maximum, unit))
+                MetricChart(series, unit, startedAtMillis, endedAtMillis)
             }
         }
     }
 }
 
 @Composable
-private fun ChartStatistic(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, style = MaterialTheme.typography.labelSmall)
-        Text(value, style = MaterialTheme.typography.bodyMedium)
+private fun GraphStatistic(label: String, value: String) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label)
+        Text(value, style = MaterialTheme.typography.bodyLarge)
     }
 }
 
