@@ -1,5 +1,6 @@
 package dev.frakw.ftmsbridge.model
 
+import dev.frakw.ftmsbridge.metrics.WorkoutMetricSnapshot
 import java.time.Instant
 
 data class IndoorBikeSample(
@@ -47,4 +48,5 @@ data class BridgeState(
     val diagnostics: List<String> = emptyList(),
     val monitoringEnabled: Boolean = false,
     val target: WorkoutTarget? = null,
+    val workoutMetrics: WorkoutMetricSnapshot = WorkoutMetricSnapshot(),
 )

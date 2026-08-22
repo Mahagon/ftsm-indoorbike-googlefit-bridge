@@ -61,6 +61,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.frakw.ftmsbridge.history.HistoryRoute
 import dev.frakw.ftmsbridge.history.HistoryViewModel
 import dev.frakw.ftmsbridge.history.WorkoutDetailRoute
+import dev.frakw.ftmsbridge.metrics.MetricChart
+import dev.frakw.ftmsbridge.metrics.MetricSeries
 import dev.frakw.ftmsbridge.model.BridgeState
 import dev.frakw.ftmsbridge.model.ConnectionState
 import dev.frakw.ftmsbridge.model.WorkoutTarget
@@ -526,7 +528,30 @@ private fun FullscreenMetricsScreen(
                 }
                 TextButton(onClick = onExit) { Text(stringResource(R.string.exit_fullscreen)) }
             }
-            if (landscape) {
+            if (state.recordingId != null) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FullscreenMetric(metrics[0], Modifier.weight(1f))
+                    FullscreenMetric(metrics[4], Modifier.weight(1f))
+                }
+                val chartMetrics = listOf(
+                    Triple(metrics[1], state.workoutMetrics.speedKph, "km/h"),
+                    Triple(metrics[2], state.workoutMetrics.cadenceRpm, "rpm"),
+                    Triple(metrics[3], state.workoutMetrics.powerWatts, "W"),
+                )
+                if (landscape) {
+                    Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        chartMetrics.forEach { (metric, series, unit) ->
+                            LiveMetricChartCard(metric, series, unit, state.startedAt!!.toEpochMilli(), now, Modifier.weight(1f).fillMaxSize(), 100.dp)
+                        }
+                    }
+                } else {
+                    Column(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        chartMetrics.forEach { (metric, series, unit) ->
+                            LiveMetricChartCard(metric, series, unit, state.startedAt!!.toEpochMilli(), now, Modifier.weight(1f).fillMaxWidth(), 58.dp)
+                        }
+                    }
+                }
+            } else if (landscape) {
                 Row(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -557,6 +582,42 @@ private fun FullscreenMetricsScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LiveMetricChartCard(
+    metric: DashboardMetric,
+    series: MetricSeries?,
+    unit: String,
+    startedAtMillis: Long,
+    endedAtMillis: Long,
+    modifier: Modifier,
+    chartHeight: androidx.compose.ui.unit.Dp,
+) {
+    val locale = Locale.forLanguageTag(LocalLocale.current.toLanguageTag())
+    Card(modifier) {
+        Column(Modifier.fillMaxSize().padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(metric.label, style = MaterialTheme.typography.titleMedium)
+            if (series == null) {
+                Text(stringResource(R.string.no_data), modifier = Modifier.align(Alignment.CenterHorizontally))
+            } else {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    ChartStatistic(stringResource(R.string.current), metric.value)
+                    ChartStatistic(stringResource(R.string.average), String.format(locale, "%.1f %s", series.average, unit))
+                    ChartStatistic(stringResource(R.string.maximum), String.format(locale, "%.1f %s", series.maximum, unit))
+                }
+                MetricChart(series, unit, startedAtMillis, endedAtMillis, chartHeight)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChartStatistic(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, style = MaterialTheme.typography.labelSmall)
+        Text(value, style = MaterialTheme.typography.bodyMedium)
     }
 }
 

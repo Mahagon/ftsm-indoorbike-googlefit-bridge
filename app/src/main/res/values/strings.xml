@@ -11,6 +11,7 @@
     <string name="calories">Calories</string>
     <string name="average">Average</string>
     <string name="maximum">Maximum</string>
+    <string name="current">Current</string>
     <string name="no_data">No data</string>
     <string name="session_target">Session target</string>
     <string name="target_next_only">Applies to the next workout only</string>

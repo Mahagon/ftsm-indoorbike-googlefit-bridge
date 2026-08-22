@@ -2,12 +2,13 @@ package dev.frakw.ftmsbridge.history
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.frakw.ftmsbridge.data.SampleEntity
 import dev.frakw.ftmsbridge.data.WorkoutDao
 import dev.frakw.ftmsbridge.data.WorkoutEntity
 import dev.frakw.ftmsbridge.data.WorkoutWithSamples
 import dev.frakw.ftmsbridge.health.HealthConnectVerification
 import dev.frakw.ftmsbridge.health.HealthConnectWorkoutVerifier
+import dev.frakw.ftmsbridge.metrics.MetricSeries
+import dev.frakw.ftmsbridge.metrics.metricSnapshot
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -27,17 +28,6 @@ data class WorkoutPage(
 
 internal fun List<WorkoutEntity>.toPage(limit: Int) = WorkoutPage(take(limit), size > limit, isLoading = false)
 
-data class MetricPoint(
-    val timestampMillis: Long,
-    val value: Double,
-)
-
-data class MetricSeries(
-    val average: Double,
-    val maximum: Double,
-    val points: List<MetricPoint>,
-)
-
 data class WorkoutDetails(
     val workout: WorkoutEntity,
     val hasSamples: Boolean,
@@ -47,49 +37,15 @@ data class WorkoutDetails(
 )
 
 internal fun WorkoutWithSamples.toDetails(): WorkoutDetails {
-    val ordered = samples.sortedBy { it.timestampMillis }
+    val metrics = samples.metricSnapshot()
     return WorkoutDetails(
         workout = workout,
         hasSamples = samples.isNotEmpty(),
-        speedKph = ordered.toMetricSeries { it.speedKph },
-        cadenceRpm = ordered.toMetricSeries { it.cadenceRpm },
-        powerWatts = ordered.toMetricSeries { it.powerWatts?.toDouble() },
+        speedKph = metrics.speedKph,
+        cadenceRpm = metrics.cadenceRpm,
+        powerWatts = metrics.powerWatts,
     )
 }
-
-private fun List<SampleEntity>.toMetricSeries(
-    value: (SampleEntity) -> Double?,
-): MetricSeries? {
-    val allPoints = mapNotNull { sample ->
-        value(sample)?.let { MetricPoint(sample.timestampMillis, it) }
-    }
-    if (allPoints.isEmpty()) return null
-    return MetricSeries(
-        average = allPoints.map { it.value }.average(),
-        maximum = allPoints.maxOf { it.value },
-        points = allPoints.downsample(MAX_CHART_POINTS),
-    )
-}
-
-internal fun List<MetricPoint>.downsample(maxPoints: Int): List<MetricPoint> {
-    require(maxPoints >= 4)
-    if (size <= maxPoints) return this
-    val interior = subList(1, lastIndex)
-    val bucketCount = (maxPoints - 2) / 2
-    val bucketSize = (interior.size + bucketCount - 1) / bucketCount
-    val reduced = interior.chunked(bucketSize).flatMap { bucket ->
-        val minimum = bucket.minBy { it.value }
-        val maximum = bucket.maxBy { it.value }
-        if (minimum === maximum) listOf(minimum) else listOf(minimum, maximum).sortedBy { it.timestampMillis }
-    }
-    return buildList {
-        add(this@downsample.first())
-        addAll(reduced)
-        add(this@downsample.last())
-    }
-}
-
-internal const val MAX_CHART_POINTS = 600
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HistoryViewModel(

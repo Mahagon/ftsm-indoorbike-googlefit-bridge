@@ -3,6 +3,7 @@ package dev.frakw.ftmsbridge
 import android.content.Context
 import dev.frakw.ftmsbridge.data.target
 import dev.frakw.ftmsbridge.ftms.FtmsClient
+import dev.frakw.ftmsbridge.metrics.LiveWorkoutMetricsAccumulator
 import dev.frakw.ftmsbridge.model.BridgeState
 import dev.frakw.ftmsbridge.model.ConnectionState
 import dev.frakw.ftmsbridge.model.IndoorBikeSample
@@ -52,6 +53,7 @@ class BridgeController internal constructor(
     private var retryJob: Job? = null
     private var automaticStartBlockedUntil: Instant? = null
     private var automaticStartNeedsBaseline = false
+    private val liveMetrics = LiveWorkoutMetricsAccumulator()
 
     constructor(
         context: Context,
@@ -62,7 +64,9 @@ class BridgeController internal constructor(
     init {
         scope.launch {
             val restored = recorder.restore()
-            restored?.let { workout ->
+            restored?.let { restoredWorkout ->
+                val workout = restoredWorkout.workout
+                liveMetrics.addAll(restoredWorkout.samples)
                 lastMeasurementAt = recorder.lastSampleTime()
                 lastSampleMillis = lastMeasurementAt?.toEpochMilli() ?: 0L
                 mutableState.update {
@@ -71,6 +75,7 @@ class BridgeController internal constructor(
                         startedAt = Instant.ofEpochMilli(workout.startedAtMillis),
                         distanceMeters = workout.distanceMeters,
                         target = workout.target(),
+                        workoutMetrics = liveMetrics.snapshot(),
                     )
                 }
             }
@@ -215,11 +220,13 @@ class BridgeController internal constructor(
                 startWorkoutLocked(sample.timestamp)
             }
             if (recorder.activeId() != null) {
-                val distance = recorder.accept(sample)
+                val result = recorder.accept(sample)
+                result.storedSample?.let(liveMetrics::add)
                 mutableState.update {
                     it.copy(
                         connection = ConnectionState.RECORDING,
-                        distanceMeters = distance,
+                        distanceMeters = result.distanceMeters,
+                        workoutMetrics = liveMetrics.snapshot(),
                     )
                 }
                 if (movementChanged) scheduleInactivityFinalization()
@@ -232,6 +239,7 @@ class BridgeController internal constructor(
         automaticStartNeedsBaseline = false
         val target = environment.pendingTarget()
         val workout = recorder.start(at, target)
+        liveMetrics.clear()
         environment.setPendingTarget(null)
         mutableState.update {
             it.copy(
@@ -241,6 +249,7 @@ class BridgeController internal constructor(
                 distanceMeters = 0.0,
                 error = null,
                 target = target,
+                workoutMetrics = liveMetrics.snapshot(),
             )
         }
     }
@@ -280,6 +289,7 @@ class BridgeController internal constructor(
         inactivityJob = null
         mutableState.update { it.copy(connection = ConnectionState.FINALIZING) }
         val result = recorder.stop(at)
+        liveMetrics.clear()
         automaticStartBlockedUntil = clock.instant().plusMillis(automaticStartCooldownMillis)
         automaticStartNeedsBaseline = client.state.value.connection != ConnectionState.READY
         lastMovementAt = null
@@ -290,6 +300,7 @@ class BridgeController internal constructor(
                 recordingId = null,
                 startedAt = null,
                 target = (result as? WorkoutStopResult.Discarded)?.workout?.target(),
+                workoutMetrics = liveMetrics.snapshot(),
             )
         }
         when (result) {

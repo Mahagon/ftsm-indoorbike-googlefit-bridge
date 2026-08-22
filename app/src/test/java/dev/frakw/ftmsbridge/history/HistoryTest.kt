@@ -3,6 +3,10 @@ package dev.frakw.ftmsbridge.history
 import dev.frakw.ftmsbridge.data.SampleEntity
 import dev.frakw.ftmsbridge.data.WorkoutEntity
 import dev.frakw.ftmsbridge.data.WorkoutWithSamples
+import dev.frakw.ftmsbridge.metrics.MAX_CHART_POINTS
+import dev.frakw.ftmsbridge.metrics.MetricPoint
+import dev.frakw.ftmsbridge.metrics.downsample
+import dev.frakw.ftmsbridge.metrics.formatElapsed
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
