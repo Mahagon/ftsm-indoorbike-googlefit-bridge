@@ -250,7 +250,6 @@ class MainActivity : ComponentActivity() {
                             onDismissUpdate = updater::dismiss,
                             onInstallUpdate = ::requestUpdateInstall,
                             onShareDiagnostics = { shareDiagnostics(state) },
-                            onFullscreen = { fullscreen = true },
                         )
                     }
                 }
@@ -336,7 +335,9 @@ class MainActivity : ComponentActivity() {
 
 internal fun shouldKeepScreenAwake(connection: ConnectionState): Boolean = connection == ConnectionState.READY || connection == ConnectionState.RECORDING
 
-internal fun canShowFullscreen(connection: ConnectionState): Boolean = connection == ConnectionState.READY || connection == ConnectionState.RECORDING
+internal fun canShowFullscreen(connection: ConnectionState): Boolean = connection == ConnectionState.RECORDING
+
+internal fun shouldShowStartWorkout(state: BridgeState): Boolean = state.connection == ConnectionState.READY && state.recordingId == null
 
 @Composable
 private fun BridgeScreen(
@@ -360,7 +361,6 @@ private fun BridgeScreen(
     onDismissUpdate: () -> Unit,
     onInstallUpdate: () -> Unit,
     onShareDiagnostics: () -> Unit,
-    onFullscreen: () -> Unit,
 ) {
     var diagnostics by remember { mutableStateOf(false) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -431,13 +431,6 @@ private fun BridgeScreen(
                 }
             }
             if (state.connection in setOf(ConnectionState.READY, ConnectionState.RECORDING, ConnectionState.FINALIZING)) {
-                if (canShowFullscreen(state.connection)) {
-                    item {
-                        OutlinedButton(onClick = onFullscreen, modifier = Modifier.fillMaxWidth()) {
-                            Text(stringResource(R.string.fullscreen_live))
-                        }
-                    }
-                }
                 item {
                     Metrics(
                         duration = state.startedAt?.let {
@@ -451,13 +444,11 @@ private fun BridgeScreen(
                     )
                 }
                 item {
-                    if (state.monitoringEnabled && state.recordingId == null) {
-                        Text(stringResource(R.string.automatic_recording))
-                    } else if (state.recordingId == null) {
+                    if (shouldShowStartWorkout(state)) {
                         Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
                             Text(stringResource(R.string.start_workout))
                         }
-                    } else {
+                    } else if (state.recordingId != null) {
                         Button(onClick = onStop, modifier = Modifier.fillMaxWidth()) {
                             Text(stringResource(if (state.monitoringEnabled) R.string.finish_now else R.string.stop_save))
                         }
