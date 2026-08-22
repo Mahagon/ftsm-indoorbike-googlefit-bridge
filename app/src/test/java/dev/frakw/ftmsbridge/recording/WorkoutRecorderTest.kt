@@ -37,7 +37,7 @@ class WorkoutRecorderTest {
         recorder.start(start)
         recorder.accept(IndoorBikeSample(start, 36.0, 90.0, 200, null, null))
         val distance = recorder.accept(IndoorBikeSample(start.plusSeconds(10), 36.0, 90.0, 200, null, null))
-        assertEquals(100.0, distance, 0.001)
+        assertEquals(100.0, distance.distanceMeters, 0.001)
     }
 
     @Test
@@ -54,6 +54,16 @@ class WorkoutRecorderTest {
     }
 
     @Test
+    fun `accept returns only the sample stored for a new interval`() = runTest {
+        val recorder = recorder(FakeDao())
+        val start = Instant.parse("2026-08-18T12:00:00Z")
+        recorder.start(start)
+
+        assertNotNull(recorder.accept(IndoorBikeSample(start, 20.0, null, null, null, null)).storedSample)
+        assertEquals(null, recorder.accept(IndoorBikeSample(start.plusMillis(500), 21.0, null, null, null, null)).storedSample)
+    }
+
+    @Test
     fun accumulatesBikeDistanceAcrossCounterReset() = runTest {
         val recorder = recorder(FakeDao())
         val start = Instant.parse("2026-08-18T12:00:00Z")
@@ -62,7 +72,7 @@ class WorkoutRecorderTest {
         recorder.accept(IndoorBikeSample(start.plusSeconds(1), null, null, null, 1_120, null))
         recorder.accept(IndoorBikeSample(start.plusSeconds(2), null, null, null, 5, null))
         val distance = recorder.accept(IndoorBikeSample(start.plusSeconds(3), null, null, null, 35, null))
-        assertEquals(150.0, distance, 0.001)
+        assertEquals(150.0, distance.distanceMeters, 0.001)
     }
 
     @Test
@@ -73,6 +83,20 @@ class WorkoutRecorderTest {
         val recorder = recorder(dao)
         assertNotNull(recorder.restore())
         assertEquals(42.0, recorder.distanceMeters(), 0.001)
+    }
+
+    @Test
+    fun `restore returns existing samples and does not duplicate their last second`() = runTest {
+        val dao = FakeDao()
+        val start = Instant.parse("2026-08-18T12:00:00Z")
+        dao.upsertWorkout(WorkoutEntity("restored", start.toEpochMilli()))
+        dao.upsertSample(SampleEntity("restored", start.toEpochMilli(), 20.0, 80.0, 200, null))
+        val recorder = recorder(dao)
+
+        val restored = recorder.restore()!!
+        assertEquals(1, restored.samples.size)
+        assertEquals(null, recorder.accept(IndoorBikeSample(start.plusMillis(500), 21.0, 81.0, 201, null, null)).storedSample)
+        assertEquals(1, dao.samples.size)
     }
 
     @Test

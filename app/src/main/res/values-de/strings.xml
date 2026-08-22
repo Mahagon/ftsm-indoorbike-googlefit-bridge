@@ -4,7 +4,7 @@
     <string name="indoor_bike">Heimtrainer</string>
     <string name="back">Zurück</string>
     <string name="duration">Dauer</string><string name="distance">Distanz</string><string name="speed">Geschwindigkeit</string><string name="cadence">Trittfrequenz</string><string name="power">Leistung</string><string name="calories">Kalorien</string>
-    <string name="average">Durchschnitt</string><string name="maximum">Maximum</string><string name="no_data">Keine Daten</string>
+    <string name="average">Durchschnitt</string><string name="maximum">Maximum</string><string name="current">Aktuell</string><string name="no_data">Keine Daten</string>
     <string name="session_target">Trainingsziel</string><string name="target_next_only">Gilt nur für das nächste Training</string><string name="minutes">Minuten</string><string name="kilometers">Kilometer</string><string name="minutes_short">min</string><string name="kilometers_short">km</string>
     <string name="invalid_minutes">Gib positive ganze Minuten ein</string><string name="invalid_distance">Gib eine positive Distanz ein</string><string name="set_target">Ziel setzen</string><string name="update_target">Ziel ändern</string><string name="clear">Löschen</string><string name="target_value">Ziel %1$s</string><string name="target_reached_value">%1$s · Ziel erreicht</string>
     <string name="exercise_history">Trainingsverlauf</string><string name="loading_history">Verlauf wird geladen…</string><string name="no_workouts">Noch keine abgeschlossenen Trainings.</string><string name="load_more">Mehr laden</string><string name="workout_details">Trainingsdetails</string><string name="loading_workout">Training wird geladen…</string>

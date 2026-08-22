@@ -21,10 +21,13 @@ class WorkoutRecorder(
     private var lastBikeEnergy: Int? = null
     private var calculatedEnergy = 0.0
 
-    suspend fun restore(): WorkoutEntity? = dao.activeWorkout()?.also {
-        active = it
-        calculatedDistance = it.distanceMeters
-        calculatedEnergy = it.caloriesKcal ?: 0.0
+    suspend fun restore(): RestoredWorkout? = dao.activeWorkout()?.let { workout ->
+        active = workout
+        calculatedDistance = workout.distanceMeters
+        calculatedEnergy = workout.caloriesKcal ?: 0.0
+        val samples = dao.workout(workout.id)?.samples.orEmpty().sortedBy { it.timestampMillis }
+        lastStoredSecond = samples.lastOrNull()?.timestampMillis?.let { it / 1_000 }
+        RestoredWorkout(workout, samples)
     }
 
     suspend fun start(
@@ -48,8 +51,8 @@ class WorkoutRecorder(
         return workout
     }
 
-    suspend fun accept(sample: IndoorBikeSample): Double {
-        val workout = active ?: return calculatedDistance
+    suspend fun accept(sample: IndoorBikeSample): WorkoutRecordingResult {
+        val workout = active ?: return WorkoutRecordingResult(calculatedDistance, null)
         val previous = lastSample
         val bikeDistance = sample.totalDistanceMeters
         if (bikeDistance != null) {
@@ -76,20 +79,20 @@ class WorkoutRecorder(
         }
 
         val second = sample.timestamp.epochSecond
+        var storedSample: SampleEntity? = null
         if (second != lastStoredSecond) {
-            dao.upsertSample(
-                SampleEntity(
-                    workoutId = workout.id,
-                    timestampMillis = sample.timestamp.toEpochMilli(),
-                    speedKph = sample.speedKph,
-                    cadenceRpm = sample.cadenceRpm,
-                    powerWatts = sample.powerWatts,
-                    bikeDistanceMeters = sample.totalDistanceMeters,
-                    sessionDistanceMeters = calculatedDistance,
-                    bikeEnergyKcal = sample.totalEnergyKcal,
-                    sessionEnergyKcal = sample.totalEnergyKcal?.let { calculatedEnergy },
-                ),
+            storedSample = SampleEntity(
+                workoutId = workout.id,
+                timestampMillis = sample.timestamp.toEpochMilli(),
+                speedKph = sample.speedKph,
+                cadenceRpm = sample.cadenceRpm,
+                powerWatts = sample.powerWatts,
+                bikeDistanceMeters = sample.totalDistanceMeters,
+                sessionDistanceMeters = calculatedDistance,
+                bikeEnergyKcal = sample.totalEnergyKcal,
+                sessionEnergyKcal = sample.totalEnergyKcal?.let { calculatedEnergy },
             )
+            dao.upsertSample(storedSample)
             lastStoredSecond = second
             active = workout.copy(
                 distanceMeters = calculatedDistance,
@@ -97,7 +100,7 @@ class WorkoutRecorder(
             )
             dao.upsertWorkout(active!!)
         }
-        return calculatedDistance
+        return WorkoutRecordingResult(calculatedDistance, storedSample)
     }
 
     suspend fun stop(at: Instant = Instant.now()): WorkoutStopResult? {
@@ -132,6 +135,10 @@ class WorkoutRecorder(
         const val MINIMUM_WORKOUT_DURATION_MILLIS = 10_000L
     }
 }
+
+data class RestoredWorkout(val workout: WorkoutEntity, val samples: List<SampleEntity>)
+
+data class WorkoutRecordingResult(val distanceMeters: Double, val storedSample: SampleEntity?)
 
 sealed interface WorkoutStopResult {
     val workout: WorkoutEntity
