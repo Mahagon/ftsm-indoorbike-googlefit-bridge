@@ -20,21 +20,31 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalLocale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import java.util.Locale
 
 @Composable
-fun MetricChart(series: MetricSeries, unit: String, startedAtMillis: Long, endedAtMillis: Long, chartHeight: Dp = 140.dp) {
+fun MetricChart(
+    series: MetricSeries,
+    unit: String,
+    startedAtMillis: Long,
+    endedAtMillis: Long,
+    chartHeight: Dp = 140.dp,
+    showOriginLabels: Boolean = true,
+) {
     val locale = Locale.forLanguageTag(LocalLocale.current.toLanguageTag())
     val lineColor = MaterialTheme.colorScheme.primary
     val gridColor = MaterialTheme.colorScheme.outlineVariant
     val durationMillis = (endedAtMillis - startedAtMillis).coerceAtLeast(1L)
     val scaleMaximum = series.maximum.coerceAtLeast(1.0)
     Row(Modifier.fillMaxWidth().height(chartHeight)) {
-        Column(Modifier.width(64.dp).fillMaxHeight().padding(end = 8.dp), Arrangement.SpaceBetween, Alignment.End) {
-            Text(String.format(locale, "%.1f %s", series.maximum, unit), style = MaterialTheme.typography.labelSmall)
-            Text(String.format(locale, "%.1f", 0.0), style = MaterialTheme.typography.labelSmall)
+        if (showOriginLabels) {
+            Column(Modifier.width(64.dp).fillMaxHeight().padding(end = 8.dp), Arrangement.SpaceBetween, Alignment.End) {
+                Text(String.format(locale, "%.1f %s", series.maximum, unit), style = MaterialTheme.typography.labelSmall)
+                Text(String.format(locale, "%.1f", 0.0), style = MaterialTheme.typography.labelSmall)
+            }
         }
         Canvas(Modifier.weight(1f).fillMaxHeight()) {
             drawLine(gridColor, Offset.Zero, Offset(size.width, 0f))
@@ -56,10 +66,19 @@ fun MetricChart(series: MetricSeries, unit: String, startedAtMillis: Long, ended
         }
     }
     Row(Modifier.fillMaxWidth()) {
-        Spacer(Modifier.width(64.dp))
-        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(formatElapsed(0), style = MaterialTheme.typography.labelSmall)
-            Text(formatElapsed(durationMillis), style = MaterialTheme.typography.labelSmall)
+        if (showOriginLabels) Spacer(Modifier.width(64.dp))
+        Row(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = if (showOriginLabels) Arrangement.SpaceBetween else Arrangement.End,
+        ) {
+            if (showOriginLabels) Text(formatElapsed(0), style = MaterialTheme.typography.labelSmall)
+            Text(
+                formatElapsed(durationMillis),
+                modifier = Modifier.testTag(METRIC_CHART_END_TIME_TAG),
+                style = MaterialTheme.typography.labelSmall,
+            )
         }
     }
 }
+
+internal const val METRIC_CHART_END_TIME_TAG = "metric_chart_end_time"

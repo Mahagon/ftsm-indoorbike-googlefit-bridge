@@ -740,6 +740,7 @@ private fun FullscreenSpeedGraphCard(state: BridgeState, now: Long, modifier: Mo
                         startedAtMillis = state.startedAt?.toEpochMilli() ?: now,
                         endedAtMillis = now,
                         chartHeight = maxOf(maxHeight - 20.dp, 24.dp),
+                        showOriginLabels = false,
                     )
                 }
             }
