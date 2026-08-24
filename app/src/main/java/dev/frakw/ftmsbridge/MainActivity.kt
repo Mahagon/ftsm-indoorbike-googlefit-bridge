@@ -10,6 +10,7 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -118,6 +119,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         TrainingRetentionManager.schedule(this)
         app.controller.retryHealthSync()
         setContent {
@@ -182,7 +184,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 if (fullscreen) {
-                    FullscreenMetricsScreen(
+                    ExpressiveFullscreenMetricsScreen(
                         state = state,
                         onExit = { fullscreen = false },
                         onStop = app.controller::stopWorkout,
@@ -222,7 +224,7 @@ class MainActivity : ComponentActivity() {
                             onBack = { destination = DESTINATION_MAIN },
                         )
 
-                        else -> BridgeScreen(
+                        else -> ExpressiveBridgeScreen(
                             state = state,
                             onConnectSetup = ::ensureBluetooth,
                             onScan = app.controller::scan,
