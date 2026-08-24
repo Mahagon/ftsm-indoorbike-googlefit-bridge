@@ -6,5 +6,7 @@
         <item name="android:statusBarColor">#101411</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher</item>
+        <item name="android:windowSplashScreenBackground">#0F1512</item>
     </style>
 </resources>

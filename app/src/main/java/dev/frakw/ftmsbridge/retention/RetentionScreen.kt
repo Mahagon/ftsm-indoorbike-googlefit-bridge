@@ -9,13 +9,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Storage
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +50,7 @@ class RetentionViewModel internal constructor(
 internal fun parseRetentionHours(value: String): Int? = value.trim().toIntOrNull()
     ?.takeIf { it in TrainingRetentionPreferences.MIN_HOURS..TrainingRetentionPreferences.MAX_HOURS }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RetentionScreen(
     status: RetentionStatus,
@@ -50,7 +60,19 @@ fun RetentionScreen(
     var hoursText by rememberSaveable(status.configuredHours) { mutableStateOf(status.configuredHours.toString()) }
     var saved by remember { mutableStateOf(false) }
     val parsedHours = parseRetentionHours(hoursText)
-    Scaffold { padding ->
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.training_retention)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.back))
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+            )
+        },
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -59,12 +81,9 @@ fun RetentionScreen(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(stringResource(R.string.training_retention), style = MaterialTheme.typography.headlineSmall)
-                TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
-            }
             Text(
                 stringResource(R.string.retention_description),
+                style = MaterialTheme.typography.bodyLarge,
             )
             OutlinedTextField(
                 value = hoursText,
@@ -97,12 +116,19 @@ fun RetentionScreen(
                 Text(stringResource(R.string.save_retention))
             }
             if (saved) Text(stringResource(R.string.retention_saved))
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(stringResource(R.string.current_storage), style = MaterialTheme.typography.titleMedium)
-                    Text(stringResource(R.string.training_hours_retained, status.retainedHours))
-                    Text(stringResource(R.string.storage_used, status.databaseBytes / 1024.0 / 1024.0))
-                    if (status.loading) Text(stringResource(R.string.calculating), style = MaterialTheme.typography.bodySmall)
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.extraLarge,
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+            ) {
+                Row(Modifier.padding(20.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Icon(Icons.Rounded.Storage, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(stringResource(R.string.current_storage), style = MaterialTheme.typography.titleLarge)
+                        Text(stringResource(R.string.training_hours_retained, status.retainedHours))
+                        Text(stringResource(R.string.storage_used, status.databaseBytes / 1024.0 / 1024.0))
+                        if (status.loading) Text(stringResource(R.string.calculating), style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
             status.warning?.let { RetentionWarningCard(it) }
@@ -116,18 +142,24 @@ fun RetentionScreen(
 
 @Composable
 fun RetentionWarningCard(message: RetentionWarning) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(stringResource(R.string.backup_warning), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
-            Text(
-                stringResource(
-                    when (message) {
-                        RetentionWarning.BACKUP_BLOCKED -> R.string.retention_warning_backup_blocked
-                        RetentionWarning.BACKUP_TARGET -> R.string.retention_warning_backup_target
-                        RetentionWarning.PROTECTED_LIMIT -> R.string.retention_warning_protected
-                    },
-                ),
-            )
+    Card(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+    ) {
+        Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Icon(Icons.Rounded.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(stringResource(R.string.backup_warning), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(
+                        when (message) {
+                            RetentionWarning.BACKUP_BLOCKED -> R.string.retention_warning_backup_blocked
+                            RetentionWarning.BACKUP_TARGET -> R.string.retention_warning_backup_target
+                            RetentionWarning.PROTECTED_LIMIT -> R.string.retention_warning_protected
+                        },
+                    ),
+                )
+            }
         }
     }
 }

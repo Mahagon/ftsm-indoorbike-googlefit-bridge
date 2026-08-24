@@ -14,7 +14,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) to contribute and [SECURITY.md](SECURITY.
 - Restores background monitoring after a phone restart.
 - Continues recording with the screen off, reconnects to the remembered bike, and finishes inactive rides automatically.
 - Writes completed stationary-cycling sessions and available metric samples to Health Connect.
-- Follows the phone's light or dark appearance setting.
+- Uses a Material 3 Expressive ride dashboard with the phone's dynamic light or dark color palette and a cycling-green fallback.
 - Checks GitHub Releases for signed updates and verifies downloaded APKs before installation.
 
 The app does not control resistance, estimate calories, or use the deprecated Google Fit API.

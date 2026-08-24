@@ -109,6 +109,7 @@
     <string name="check_updates">Check updates</string>
     <string name="storage">Storage</string>
     <string name="diagnostics">Diagnostics</string>
+    <string name="more_options">More options</string>
     <string name="raw_packet">Raw packet</string>
     <string name="no_packet">No packet received</string>
     <string name="share_diagnostics">Share diagnostic log</string>

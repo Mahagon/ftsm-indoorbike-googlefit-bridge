@@ -12,12 +12,27 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.DirectionsBike
+import androidx.compose.material.icons.rounded.Error
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -66,6 +81,7 @@ fun WorkoutDetailRoute(
     WorkoutDetailScreen(details, verification, onBack, onRetrySync) { viewModel.verifyHealthConnect(workoutId) }
 }
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun HistoryScreen(
     page: WorkoutPage,
@@ -73,24 +89,43 @@ private fun HistoryScreen(
     onBack: () -> Unit,
     onWorkout: (String) -> Unit,
 ) {
-    Scaffold { padding ->
+    Scaffold(topBar = { HistoryTopBar(stringResource(R.string.exercise_history), onBack) }) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { ScreenHeader(stringResource(R.string.exercise_history), onBack) }
             if (page.isLoading) {
-                item { Text(stringResource(R.string.loading_history)) }
+                item {
+                    Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        LoadingIndicator()
+                        Text(stringResource(R.string.loading_history), modifier = Modifier.padding(top = 12.dp))
+                    }
+                }
             } else if (page.workouts.isEmpty()) {
-                item { Text(stringResource(R.string.no_workouts), style = MaterialTheme.typography.bodyLarge) }
+                item {
+                    Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Rounded.DirectionsBike, contentDescription = null, modifier = Modifier.padding(bottom = 12.dp))
+                        Text(stringResource(R.string.no_workouts), style = MaterialTheme.typography.titleMedium)
+                    }
+                }
             }
             items(page.workouts, key = { it.id }) { workout ->
-                Card(onClick = { onWorkout(workout.id) }, modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(formatDateTime(workout.startedAtMillis), style = MaterialTheme.typography.titleMedium)
-                        SummaryRow(stringResource(R.string.duration), formatDuration(workout))
-                        SummaryRow(stringResource(R.string.distance), formatDistance(workout.distanceMeters))
-                        Text(syncLabel(workout), color = syncColor(workout))
+                ElevatedCard(
+                    onClick = { onWorkout(workout.id) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
+                ) {
+                    Row(Modifier.padding(18.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Icon(Icons.Rounded.DirectionsBike, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(formatDateTime(workout.startedAtMillis), style = MaterialTheme.typography.titleMedium)
+                            SummaryRow(stringResource(R.string.duration), formatDuration(workout))
+                            SummaryRow(stringResource(R.string.distance), formatDistance(workout.distanceMeters))
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(syncIcon(workout), contentDescription = null, tint = syncColor(workout))
+                                Text(syncLabel(workout), color = syncColor(workout), style = MaterialTheme.typography.labelLarge)
+                            }
+                        }
                     }
                 }
             }
@@ -103,6 +138,7 @@ private fun HistoryScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun WorkoutDetailScreen(
     details: WorkoutDetails?,
@@ -112,18 +148,26 @@ private fun WorkoutDetailScreen(
     onVerifyHealthConnect: () -> Unit,
 ) {
     val locale = Locale.forLanguageTag(LocalLocale.current.toLanguageTag())
-    Scaffold { padding ->
+    Scaffold(topBar = { HistoryTopBar(stringResource(R.string.workout_details), onBack) }) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { ScreenHeader(stringResource(R.string.workout_details), onBack) }
             if (details == null) {
-                item { Text(stringResource(R.string.loading_workout)) }
+                item {
+                    Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        LoadingIndicator()
+                        Text(stringResource(R.string.loading_workout), modifier = Modifier.padding(top = 12.dp))
+                    }
+                }
             } else {
                 val workout = details.workout
                 item {
-                    Card(Modifier.fillMaxWidth()) {
+                    ElevatedCard(
+                        Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.extraLarge,
+                        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                    ) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             DetailRow(stringResource(R.string.started), formatDateTime(workout.startedAtMillis))
                             DetailRow(stringResource(R.string.ended), workout.endedAtMillis?.let(::formatDateTime) ?: "—")
@@ -252,15 +296,18 @@ private fun HealthConnectVerificationIssue.labelResource(): Int = when (this) {
     HealthConnectVerificationIssue.DISTANCE_VERSION_MISMATCH -> R.string.health_issue_distance_version
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ScreenHeader(title: String, onBack: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
-        Text(title, style = MaterialTheme.typography.headlineMedium)
-    }
+private fun HistoryTopBar(title: String, onBack: () -> Unit) {
+    TopAppBar(
+        title = { Text(title, style = MaterialTheme.typography.titleLarge) },
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.back))
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+    )
 }
 
 @Composable
@@ -318,6 +365,12 @@ private fun syncColor(workout: WorkoutEntity) = when {
     workout.synced -> MaterialTheme.colorScheme.primary
     workout.syncError != null -> MaterialTheme.colorScheme.error
     else -> MaterialTheme.colorScheme.onSurfaceVariant
+}
+
+private fun syncIcon(workout: WorkoutEntity) = when {
+    workout.synced -> Icons.Rounded.CheckCircle
+    workout.syncError != null -> Icons.Rounded.Error
+    else -> Icons.Rounded.Schedule
 }
 
 internal fun formatDuration(workout: WorkoutEntity): String {

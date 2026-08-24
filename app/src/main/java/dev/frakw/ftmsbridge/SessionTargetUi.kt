@@ -9,9 +9,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -68,6 +74,7 @@ internal fun formatTarget(target: WorkoutTarget): String = when (target) {
     is WorkoutTarget.Distance -> String.format(Locale.getDefault(), "%.2f km", target.meters / 1_000)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun TargetEditor(current: WorkoutTarget?, onTargetChanged: (WorkoutTarget?) -> Unit) {
     var kind by rememberSaveable { mutableStateOf(current.kind()) }
@@ -80,29 +87,33 @@ internal fun TargetEditor(current: WorkoutTarget?, onTargetChanged: (WorkoutTarg
             invalid = false
         }
     }
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.session_target), style = MaterialTheme.typography.titleMedium)
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+    ) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(stringResource(R.string.session_target), style = MaterialTheme.typography.headlineSmall)
             Text(stringResource(R.string.target_next_only), style = MaterialTheme.typography.bodySmall)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                SegmentedButton(
                     selected = kind == TargetKind.DURATION,
                     onClick = {
                         kind = TargetKind.DURATION
                         input = ""
                         invalid = false
                     },
-                    label = { Text(stringResource(R.string.duration)) },
-                )
-                FilterChip(
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                ) { Text(stringResource(R.string.duration)) }
+                SegmentedButton(
                     selected = kind == TargetKind.DISTANCE,
                     onClick = {
                         kind = TargetKind.DISTANCE
                         input = ""
                         invalid = false
                     },
-                    label = { Text(stringResource(R.string.distance)) },
-                )
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                ) { Text(stringResource(R.string.distance)) }
             }
             OutlinedTextField(
                 value = input,
@@ -146,31 +157,35 @@ internal fun TargetEditor(current: WorkoutTarget?, onTargetChanged: (WorkoutTarg
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun ProgressMetric(label: String, value: String, target: String, progress: Float) {
-    val fill = MaterialTheme.colorScheme.primaryContainer
-    Card(Modifier.fillMaxWidth()) {
-        Row(
+    Card(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+    ) {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .semantics { progressBarRangeInfo = androidx.compose.ui.semantics.ProgressBarRangeInfo(progress, 0f..1f) }
-                .drawProgress(fill, progress)
                 .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Column {
-                Text(label)
-                Text(
-                    if (progress >= 1f) {
-                        stringResource(R.string.target_reached_value, target)
-                    } else {
-                        stringResource(R.string.target_value, target)
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column {
+                    Text(label)
+                    Text(
+                        if (progress >= 1f) {
+                            stringResource(R.string.target_reached_value, target)
+                        } else {
+                            stringResource(R.string.target_value, target)
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                Text(value, style = MaterialTheme.typography.titleLarge)
             }
-            Text(value, style = MaterialTheme.typography.titleLarge)
+            LinearWavyProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
         }
     }
 }
