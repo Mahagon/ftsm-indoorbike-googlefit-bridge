@@ -8,12 +8,14 @@ import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.frakw.ftmsbridge.metrics.METRIC_CHART_END_TIME_TAG
 import dev.frakw.ftmsbridge.metrics.MetricPoint
 import dev.frakw.ftmsbridge.metrics.MetricSeries
 import dev.frakw.ftmsbridge.metrics.WorkoutMetricSnapshot
@@ -134,6 +136,11 @@ class ExpressiveUiInstrumentedTest {
         compose.onNodeWithContentDescription(context.getString(R.string.exit_fullscreen)).assertIsDisplayed()
         compose.onAllNodesWithText(context.getString(R.string.average)).assertCountEquals(1)
         compose.onAllNodesWithText(context.getString(R.string.maximum)).assertCountEquals(1)
+        val locale = context.resources.configuration.locales[0]
+        compose.onAllNodesWithText(String.format(locale, "%.1f km/h", speed.maximum)).assertCountEquals(1)
+        compose.onNodeWithText(String.format(locale, "%.1f", 0.0)).assertDoesNotExist()
+        compose.onNodeWithText("00:00").assertDoesNotExist()
+        compose.onNodeWithTag(METRIC_CHART_END_TIME_TAG).assertIsDisplayed()
         compose.onAllNodes(hasScrollAction()).assertCountEquals(0)
     }
 
