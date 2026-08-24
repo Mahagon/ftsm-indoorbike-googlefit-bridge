@@ -77,7 +77,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.frakw.ftmsbridge.metrics.MetricChart
-import dev.frakw.ftmsbridge.metrics.MetricSeries
 import dev.frakw.ftmsbridge.model.BridgeState
 import dev.frakw.ftmsbridge.model.ConnectionState
 import dev.frakw.ftmsbridge.model.WorkoutTarget
@@ -613,16 +612,38 @@ internal fun ExpressiveFullscreenMetricsScreen(state: BridgeState, onExit: () ->
                     Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.exit_fullscreen))
                 }
             }
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                item {
-                    if (landscape) LandscapeMetricGrid(state, duration) else RideMetricGrid(state, duration)
+            if (landscape) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    FullscreenSpeedGraphCard(
+                        state = state,
+                        now = now,
+                        modifier = Modifier.weight(1.45f).fillMaxHeight(),
+                    )
+                    FullscreenMetricGrid(
+                        state = state,
+                        duration = duration,
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    )
                 }
-                item { ExpressiveGraphCard(stringResource(R.string.speed), state.workoutMetrics.speedKph, "km/h", state, now) }
-                item { ExpressiveGraphCard(stringResource(R.string.cadence), state.workoutMetrics.cadenceRpm, "rpm", state, now) }
-                item { ExpressiveGraphCard(stringResource(R.string.power), state.workoutMetrics.powerWatts, "W", state, now) }
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    FullscreenSpeedGraphCard(
+                        state = state,
+                        now = now,
+                        modifier = Modifier.fillMaxWidth().weight(1.25f),
+                    )
+                    FullscreenMetricGrid(
+                        state = state,
+                        duration = duration,
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                    )
+                }
             }
             if (state.recordingId != null) {
                 Button(
@@ -643,37 +664,98 @@ internal fun ExpressiveFullscreenMetricsScreen(state: BridgeState, onExit: () ->
 }
 
 @Composable
-private fun LandscapeMetricGrid(state: BridgeState, duration: Long) {
+private fun FullscreenMetricGrid(state: BridgeState, duration: Long, modifier: Modifier = Modifier) {
     val locale = Locale.forLanguageTag(LocalLocale.current.toLanguageTag())
-    Row(Modifier.fillMaxWidth().height(150.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        MetricTile(stringResource(R.string.speed), state.latest?.speedKph?.let { String.format(locale, "%.1f", it) } ?: "—", "km/h", Modifier.weight(1.35f).fillMaxHeight(), true)
-        MetricTile(stringResource(R.string.cadence), state.latest?.cadenceRpm?.let { String.format(locale, "%.0f", it) } ?: "—", "rpm", Modifier.weight(1f).fillMaxHeight())
-        MetricTile(stringResource(R.string.power), state.latest?.powerWatts?.toString() ?: "—", "W", Modifier.weight(1f).fillMaxHeight())
-        MetricTile(stringResource(R.string.duration), "%02d:%02d:%02d".format(duration / 3600, duration / 60 % 60, duration % 60), null, Modifier.weight(1.25f).fillMaxHeight())
-        MetricTile(stringResource(R.string.distance), String.format(locale, "%.2f", state.distanceMeters / 1_000.0), "km", Modifier.weight(1f).fillMaxHeight())
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            MetricTile(
+                stringResource(R.string.cadence),
+                state.latest?.cadenceRpm?.let { String.format(locale, "%.0f", it) } ?: "—",
+                "rpm",
+                Modifier.weight(1f).fillMaxHeight(),
+            )
+            MetricTile(
+                stringResource(R.string.power),
+                state.latest?.powerWatts?.toString() ?: "—",
+                "W",
+                Modifier.weight(1f).fillMaxHeight(),
+            )
+        }
+        Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            MetricTile(
+                stringResource(R.string.duration),
+                "%02d:%02d:%02d".format(duration / 3600, duration / 60 % 60, duration % 60),
+                null,
+                Modifier.weight(1f).fillMaxHeight(),
+            )
+            MetricTile(
+                stringResource(R.string.distance),
+                String.format(locale, "%.2f", state.distanceMeters / 1_000.0),
+                "km",
+                Modifier.weight(1f).fillMaxHeight(),
+            )
+        }
     }
 }
 
 @Composable
-private fun ExpressiveGraphCard(label: String, series: MetricSeries?, unit: String, state: BridgeState, now: Long) {
-    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(label, style = MaterialTheme.typography.titleLarge)
+private fun FullscreenSpeedGraphCard(state: BridgeState, now: Long, modifier: Modifier = Modifier) {
+    val locale = Locale.forLanguageTag(LocalLocale.current.toLanguageTag())
+    val currentSpeed = state.latest?.speedKph?.let { String.format(locale, "%.1f", it) } ?: "—"
+    val series = state.workoutMetrics.speedKph
+    Card(modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
+        Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.speed), style = MaterialTheme.typography.titleLarge)
+                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(currentSpeed, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+                    Text("km/h", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(bottom = 4.dp))
+                }
+            }
             if (series == null) {
-                Text(stringResource(R.string.no_data), modifier = Modifier.align(Alignment.CenterHorizontally))
+                Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                    Text(stringResource(R.string.no_data))
+                }
             } else {
-                val locale = Locale.forLanguageTag(LocalLocale.current.toLanguageTag())
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(stringResource(R.string.average), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(String.format(locale, "%.1f %s", series.average, unit), fontWeight = FontWeight.Bold)
+                    FullscreenGraphStatistic(
+                        label = stringResource(R.string.average),
+                        value = String.format(locale, "%.1f km/h", series.average),
+                        horizontalAlignment = Alignment.Start,
+                    )
+                    FullscreenGraphStatistic(
+                        label = stringResource(R.string.maximum),
+                        value = String.format(locale, "%.1f km/h", series.maximum),
+                        horizontalAlignment = Alignment.End,
+                    )
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(stringResource(R.string.maximum), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(String.format(locale, "%.1f %s", series.maximum, unit), fontWeight = FontWeight.Bold)
+                BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+                    MetricChart(
+                        series = series,
+                        unit = "km/h",
+                        startedAtMillis = state.startedAt?.toEpochMilli() ?: now,
+                        endedAtMillis = now,
+                        chartHeight = maxOf(maxHeight - 20.dp, 24.dp),
+                    )
                 }
-                MetricChart(series, unit, state.startedAt?.toEpochMilli() ?: now, now)
             }
         }
+    }
+}
+
+@Composable
+private fun FullscreenGraphStatistic(
+    label: String,
+    value: String,
+    horizontalAlignment: Alignment.Horizontal,
+) {
+    Column(horizontalAlignment = horizontalAlignment) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
     }
 }
 
