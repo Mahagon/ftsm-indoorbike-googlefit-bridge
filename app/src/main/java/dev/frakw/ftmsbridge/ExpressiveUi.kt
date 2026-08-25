@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.HealthAndSafety
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.PrivacyTip
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.Storage
@@ -101,6 +102,7 @@ internal fun ExpressiveBridgeScreen(
     onMonitoringChanged: (Boolean) -> Unit,
     onTargetChanged: (WorkoutTarget?) -> Unit,
     onHealthPermissions: () -> Unit,
+    onPrivacy: () -> Unit,
     onHistory: () -> Unit,
     retentionStatus: RetentionStatus,
     onRetention: () -> Unit,
@@ -153,6 +155,10 @@ internal fun ExpressiveBridgeScreen(
                             UtilityItem(Icons.Rounded.HealthAndSafety, R.string.health_permissions) {
                                 utilitiesExpanded = false
                                 onHealthPermissions()
+                            }
+                            UtilityItem(Icons.Rounded.PrivacyTip, R.string.privacy_title) {
+                                utilitiesExpanded = false
+                                onPrivacy()
                             }
                             if (updatesEnabled) {
                                 UtilityItem(Icons.Rounded.SystemUpdate, R.string.check_updates) {
@@ -571,6 +577,13 @@ private fun DiagnosticsSheet(state: BridgeState, onShare: () -> Unit, onDismiss:
                         Text(state.rawPacket ?: stringResource(R.string.no_packet), fontFamily = FontFamily.Monospace)
                     }
                 }
+            }
+            item {
+                Text(
+                    stringResource(R.string.diagnostics_share_privacy),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
             item {
                 OutlinedButton(onClick = onShare, modifier = Modifier.fillMaxWidth()) {

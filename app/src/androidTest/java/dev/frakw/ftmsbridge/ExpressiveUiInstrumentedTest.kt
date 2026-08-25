@@ -86,6 +86,33 @@ class ExpressiveUiInstrumentedTest {
     }
 
     @Test
+    fun privacyOpensFromUtilitiesMenu() {
+        var opened = false
+        compose.setContent {
+            FtmsBridgeTheme(dynamicColor = false) {
+                TestHome(BridgeState(), onPrivacy = { opened = true })
+            }
+        }
+
+        compose.onNodeWithContentDescription(context.getString(R.string.more_options)).performClick()
+        compose.onNodeWithText(context.getString(R.string.privacy_title)).performClick()
+        assertTrue(opened)
+    }
+
+    @Test
+    fun diagnosticsExplainsSharedData() {
+        compose.setContent {
+            FtmsBridgeTheme(dynamicColor = false) {
+                TestHome(BridgeState())
+            }
+        }
+
+        compose.onNodeWithContentDescription(context.getString(R.string.more_options)).performClick()
+        compose.onNodeWithText(context.getString(R.string.diagnostics)).performClick()
+        compose.onNodeWithText(context.getString(R.string.diagnostics_share_privacy)).assertIsDisplayed()
+    }
+
+    @Test
     fun fullscreenDashboardFitsPortraitWithoutScrolling() {
         assertFullscreenDashboardFits(DpSize(412.dp, 892.dp))
     }
@@ -145,7 +172,11 @@ class ExpressiveUiInstrumentedTest {
     }
 
     @androidx.compose.runtime.Composable
-    private fun TestHome(state: BridgeState, onStart: () -> Unit = {}) {
+    private fun TestHome(
+        state: BridgeState,
+        onStart: () -> Unit = {},
+        onPrivacy: () -> Unit = {},
+    ) {
         ExpressiveBridgeScreen(
             state = state,
             onConnectSetup = {},
@@ -156,6 +187,7 @@ class ExpressiveUiInstrumentedTest {
             onMonitoringChanged = {},
             onTargetChanged = {},
             onHealthPermissions = {},
+            onPrivacy = onPrivacy,
             onHistory = {},
             retentionStatus = RetentionStatus(loading = false),
             onRetention = {},

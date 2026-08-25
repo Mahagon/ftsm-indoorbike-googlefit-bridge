@@ -2,7 +2,7 @@
 
 FTMS Bike Bridge is an Android app that records workouts from an FTMS-compatible indoor bike over Bluetooth Low Energy. Workouts are saved in the app, exported to Android Health Connect, and can then appear in Google Health.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) to contribute and [SECURITY.md](SECURITY.md) to report a vulnerability privately.
+See [PRIVACY.md](PRIVACY.md) for how the app handles data, [CONTRIBUTING.md](CONTRIBUTING.md) to contribute, and [SECURITY.md](SECURITY.md) to report a vulnerability privately.
 
 ## Features
 
