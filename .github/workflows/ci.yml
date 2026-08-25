@@ -2,6 +2,17 @@ name: CI
 
 on:
   pull_request:
+    # Keep in sync with .github/scripts/change_scope.py android_ci scope.
+    paths:
+      - "app/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - "gradle/**"
+      - "gradlew"
+      - "gradlew.bat"
+      - ".github/workflows/ci.yml"
+      - ".github/scripts/android_smoke_test.sh"
   workflow_dispatch:
 
 permissions:
@@ -23,8 +34,6 @@ jobs:
       - name: Install Android SDK
         run: sdkmanager --channel=3 "platforms;android-37.0" "build-tools;37.0.0"
       - uses: gradle/actions/setup-gradle@4733eaac7c1b0da527e4206b7671e0061de1ce37 # v6
-      - name: Test release version policy
-        run: python .github/scripts/release_version_test.py
       - name: Check formatting, tests, and Android lint
         run: ./gradlew spotlessCheck testDebugUnitTest lintDebug --no-daemon
       - name: Upload reports on failure

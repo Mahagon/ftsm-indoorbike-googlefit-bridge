@@ -3,6 +3,16 @@ name: Auto Release
 on:
   push:
     branches: [main]
+    # Keep in sync with .github/scripts/change_scope.py production scope.
+    paths:
+      - "app/src/main/**"
+      - "app/build.gradle.kts"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - "gradle/**"
+      - "gradlew"
+      - "gradlew.bat"
 
 permissions:
   actions: write

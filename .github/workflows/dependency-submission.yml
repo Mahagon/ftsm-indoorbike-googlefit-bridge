@@ -3,6 +3,16 @@ name: Dependency Submission
 on:
   push:
     branches: [main]
+    # Keep in sync with .github/scripts/change_scope.py dependencies scope.
+    paths:
+      - "app/build.gradle.kts"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - "gradle/**"
+      - "gradlew"
+      - "gradlew.bat"
+      - ".github/workflows/dependency-submission.yml"
   workflow_dispatch:
 
 permissions:
