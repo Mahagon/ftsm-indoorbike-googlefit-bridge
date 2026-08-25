@@ -241,6 +241,7 @@ class MainActivity : ComponentActivity() {
                             onMonitoringChanged = ::setMonitoringEnabled,
                             onTargetChanged = app.controller::setNextWorkoutTarget,
                             onHealthPermissions = { healthLauncher.launch(app.healthWriter.permissions) },
+                            onPrivacy = { startActivity(Intent(this, PrivacyActivity::class.java)) },
                             onHistory = { destination = DESTINATION_HISTORY },
                             retentionStatus = retentionStatus,
                             onRetention = { destination = DESTINATION_RETENTION },

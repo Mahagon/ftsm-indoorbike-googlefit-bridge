@@ -21,6 +21,8 @@ class LocalizationTest {
         assertEquals("Heimtrainer", german.getString(R.string.indoor_bike))
         assertEquals("Jetzt beenden", german.getString(R.string.finish_now))
         assertEquals("In Health Connect gespeichert", german.getString(R.string.saved_health_connect))
+        assertEquals("Datenschutz und Datennutzung", german.getString(R.string.privacy_title))
+        assertEquals("Vollständige Richtlinie auf GitHub", german.getString(R.string.privacy_open_full_policy))
     }
 
     @Test
@@ -28,6 +30,7 @@ class LocalizationTest {
         val french = localizedContext(Locale.FRENCH)
         assertEquals("Exercise bike", french.getString(R.string.indoor_bike))
         assertEquals("Finish now", french.getString(R.string.finish_now))
+        assertEquals("Privacy and data usage", french.getString(R.string.privacy_title))
     }
 
     private fun localizedContext(locale: Locale): Context {
