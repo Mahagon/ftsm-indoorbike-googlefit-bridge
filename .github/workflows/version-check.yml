@@ -12,16 +12,28 @@ jobs:
     name: Validate version
     runs-on: ubuntu-latest
     steps:
-      - name: Dependabot exemption
-        if: github.event.pull_request.user.login == 'dependabot[bot]'
-        run: echo "Dependabot pull requests do not create releases."
       - name: Check out repository and tags
-        if: github.event.pull_request.user.login != 'dependabot[bot]'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+      - name: Test workflow policies
+        run: python -m unittest discover -s .github/scripts -p "*_test.py"
+      - name: Classify changed paths
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git diff --name-only "$BASE_SHA" "$HEAD_SHA" |
+            python .github/scripts/change_scope.py --github-output "$GITHUB_OUTPUT"
+      - name: Dependabot exemption
+        if: github.event.pull_request.user.login == 'dependabot[bot]'
+        run: echo "Dependabot pull requests do not create releases."
+      - name: No release needed
+        if: github.event.pull_request.user.login != 'dependabot[bot]' && steps.scope.outputs.production != 'true'
+        run: echo "This pull request does not change production or build inputs."
       - name: Validate release branch
-        if: github.event.pull_request.user.login != 'dependabot[bot]'
+        if: github.event.pull_request.user.login != 'dependabot[bot]' && steps.scope.outputs.production == 'true'
         env:
           RELEASE_BRANCH: ${{ github.head_ref }}
         run: python .github/scripts/release_version.py "$RELEASE_BRANCH"
