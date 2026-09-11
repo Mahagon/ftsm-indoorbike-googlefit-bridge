@@ -18,6 +18,7 @@ GRADLE_INPUTS = {
     "gradlew",
     "gradlew.bat",
 }
+NON_PRODUCTION_GRADLE_INPUTS = {"gradle/verification-metadata.xml"}
 
 
 def _normalize(path: str) -> str:
@@ -45,7 +46,9 @@ def classify(paths: Iterable[str]) -> dict[str, bool]:
             continue
 
         gradle_input = _is_gradle_input(path)
-        production = path.startswith("app/src/main/") or gradle_input
+        production = path.startswith("app/src/main/") or (
+            gradle_input and path not in NON_PRODUCTION_GRADLE_INPUTS
+        )
         android_ci = (
             path.startswith("app/")
             or gradle_input
