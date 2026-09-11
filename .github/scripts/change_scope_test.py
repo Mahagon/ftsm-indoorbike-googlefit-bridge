@@ -48,6 +48,7 @@ class ChangeScopeTest(unittest.TestCase):
                 "android_ci",
                 "dependencies",
             ),
+            "gradle/verification-metadata.xml": ("android_ci", "dependencies"),
             "gradle/wrapper/gradle-wrapper.properties": (
                 "production",
                 "android_ci",

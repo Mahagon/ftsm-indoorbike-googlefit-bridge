@@ -1,11 +1,13 @@
 package dev.frakw.ftmsbridge
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertTrue
@@ -38,9 +40,16 @@ class PrivacyScreenInstrumentedTest {
 
         compose.onNodeWithText(context.getString(R.string.privacy_title)).assertIsDisplayed()
         compose.onNodeWithText(context.getString(R.string.privacy_summary)).assertIsDisplayed()
-        compose.onNodeWithText(context.getString(R.string.privacy_open_full_policy)).performScrollTo().performClick()
-        compose.onNodeWithText(context.getString(R.string.privacy_contact_issues)).performScrollTo().performClick()
-        compose.onNodeWithText(context.getString(R.string.privacy_contact_private)).performScrollTo().performClick()
+        val privacyActions = listOf(
+            R.string.privacy_open_full_policy,
+            R.string.privacy_contact_issues,
+            R.string.privacy_contact_private,
+        )
+        privacyActions.forEach { action ->
+            val text = context.getString(action)
+            compose.onNode(hasScrollAction()).performScrollToNode(hasText(text))
+            compose.onNodeWithText(text).performClick()
+        }
 
         assertTrue(policyOpened)
         assertTrue(contactOpened)
