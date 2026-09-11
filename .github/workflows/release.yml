@@ -27,7 +27,7 @@ jobs:
           packages: platform-tools
       - name: Install Android SDK
         run: sdkmanager --channel=3 "platforms;android-37.0" "build-tools;37.0.0"
-      - uses: gradle/actions/setup-gradle@4733eaac7c1b0da527e4206b7671e0061de1ce37 # v6
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
       - name: Derive Android version from tag
         shell: bash
         run: |
