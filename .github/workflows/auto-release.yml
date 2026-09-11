@@ -47,7 +47,8 @@ jobs:
           echo "number=$(jq -r '.number' <<< "$pull_request")" >> "$GITHUB_OUTPUT"
       - name: Dependabot exemption
         if: steps.pull-request.outputs.author == 'dependabot[bot]'
-        run: echo "Dependabot pull request #${{ steps.pull-request.outputs.number }} does not create a release."
+        run: |
+          echo "Dependabot pull request #${{ steps.pull-request.outputs.number }} does not create a release."
       - name: Check out merged commit and tags
         if: steps.pull-request.outputs.author != 'dependabot[bot]'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
