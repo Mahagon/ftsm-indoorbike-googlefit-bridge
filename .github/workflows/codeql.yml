@@ -13,7 +13,6 @@ on:
       - "gradle.properties"
       - "gradle/**"
       - "gradlew"
-      - "gradlew.bat"
       - ".github/workflows/**"
       - ".github/actions/**"
       - ".github/scripts/change_scope.py"

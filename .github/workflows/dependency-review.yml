@@ -10,7 +10,6 @@ on:
       - "gradle.properties"
       - "gradle/**"
       - "gradlew"
-      - "gradlew.bat"
       - ".github/workflows/dependency-review.yml"
 
 permissions:

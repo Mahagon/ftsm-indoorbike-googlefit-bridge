@@ -23,12 +23,12 @@ Do not place the client secret, authorization code, access token, refresh token,
 
 ## 3. Query imported exercises
 
-In a temporary PowerShell session, set the access token and query one civil-date interval. The end is exclusive.
+In a temporary shell session, set the access token and query one civil-date interval. The end is exclusive.
 
-```powershell
-$env:GOOGLE_HEALTH_ACCESS_TOKEN = "temporary-access-token"
-.\tools\google-health-exercises.ps1 -Start "2026-08-21" -End "2026-08-22"
-Remove-Item Env:GOOGLE_HEALTH_ACCESS_TOKEN
+```shell
+export GOOGLE_HEALTH_ACCESS_TOKEN="temporary-access-token"
+./tools/google-health-exercises.sh --start "2026-08-21" --end "2026-08-22"
+unset GOOGLE_HEALTH_ACCESS_TOKEN
 ```
 
 The script follows pagination and returns only records whose source is `HEALTH_CONNECT` and whose source package is `dev.frakw.ftmsbridge`. Compare the workout interval and `exercise.metricsSummary.distanceMillimeters` with the in-app verification result. The endpoint and supported filters are documented in the [Google Health exercise list reference](https://developers.google.com/health/reference/rest/v4/users.dataTypes.dataPoints/list).

@@ -12,7 +12,6 @@ on:
       - "gradle.properties"
       - "gradle/**"
       - "gradlew"
-      - "gradlew.bat"
 
 permissions:
   actions: write

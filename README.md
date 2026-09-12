@@ -137,7 +137,7 @@ Open **Diagnostics** to inspect the latest raw FTMS packet and discovered GATT c
 
 Development requires:
 
-- Android Studio with JDK 17.
+- Android Studio and JDK 25 (JDK 17 is the minimum supported runtime).
 - Android SDK Platform 37 and Android SDK Build-Tools 37.0.0.
 
 Clone the repository, open it in Android Studio, and allow Gradle sync to finish. Run the `app` configuration on an Android 14+ phone, or install a debug build from the command line:
@@ -147,6 +147,42 @@ Clone the repository, open it in Android Studio, and allow Gradle sync to finish
 ```
 
 The project compiles and targets API 37 and has a minimum SDK of API 34.
+
+### Bazzite setup
+
+Bazzite has an immutable Fedora base, so avoid layering development packages with `rpm-ostree`. Install the graphical IDE through Bazzite's preferred Flatpak path and the command-line JDK through Homebrew:
+
+```shell
+flatpak install flathub com.google.AndroidStudio
+brew install openjdk@25
+```
+
+In Android Studio, open **Tools → SDK Manager** and install:
+
+- Android SDK Platform 37 (shown as Android 17 / Cinnamon Bun Preview).
+- Android SDK Build-Tools 37.0.0.
+- Android SDK Platform-Tools.
+- Android SDK Command-line Tools (latest).
+- Android Emulator and an API 37 system image only if you want a virtual device.
+
+For command-line builds, add the JDK and the SDK installed by Android Studio to Bash. Put these lines in `~/.bashrc`, then open a new terminal:
+
+```shell
+export JAVA_HOME="$(brew --prefix openjdk@25)"
+export ANDROID_HOME="$HOME/Android/Sdk"
+export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
+```
+
+Confirm the setup from the repository root:
+
+```shell
+java -version
+adb version
+./gradlew --version
+./gradlew assembleDebug
+```
+
+For a physical phone, enable Developer options and USB or wireless debugging. Wireless debugging avoids host USB-rule configuration. For an emulator, enable CPU virtualization in UEFI and verify KVM access with `test -r /dev/kvm && test -w /dev/kvm`.
 
 ## Verification and CI
 
@@ -179,12 +215,12 @@ Create a protected GitHub Actions environment named `release` with these secrets
 
 Create and back up the release key outside this repository:
 
-```powershell
+```shell
 keytool -genkeypair -v -keystore ftms-bridge-release.jks -alias ftms-bridge -keyalg RSA -keysize 4096 -validity 10000
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("ftms-bridge-release.jks")) | Set-Clipboard
+base64 --wrap=0 ftms-bridge-release.jks | wl-copy
 ```
 
-Store the Base64 value and matching credentials in the release environment. Keep the original keystore and passwords in a secure backup: losing the key prevents future APKs from updating existing installations.
+Store the Base64 value and matching credentials in the release environment. The clipboard command requires `wl-copy` from `wl-clipboard`; alternatively redirect the Base64 output to a temporary file outside the repository. Keep the original keystore and passwords in a secure backup: losing the key prevents future APKs from updating existing installations.
 
 Human pull-request branches use the next semantic version without a `v` prefix, such as `0.2.0`. The version check requires that branch version to be greater than the latest release. After the pull request is merged into `main`, automation creates the matching `v0.2.0` tag and starts this release workflow. Dependabot pull requests are exempt and do not create releases.
 

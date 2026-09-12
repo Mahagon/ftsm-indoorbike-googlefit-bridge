@@ -16,7 +16,6 @@ GRADLE_INPUTS = {
     "settings.gradle.kts",
     "gradle.properties",
     "gradlew",
-    "gradlew.bat",
 }
 NON_PRODUCTION_GRADLE_INPUTS = {"gradle/verification-metadata.xml"}
 
