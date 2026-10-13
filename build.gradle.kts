@@ -5,9 +5,9 @@ buildscript {
     }
     dependencies {
         constraints {
-            classpath("org.bouncycastle:bcpkix-jdk18on:1.84")
-            classpath("org.bouncycastle:bcprov-jdk18on:1.84")
-            classpath("org.bouncycastle:bcutil-jdk18on:1.84")
+            classpath("org.bouncycastle:bcpkix-jdk18on:1.85")
+            classpath("org.bouncycastle:bcprov-jdk18on:1.85")
+            classpath("org.bouncycastle:bcutil-jdk18on:1.85")
             classpath("org.apache.commons:commons-lang3:3.20.0")
             classpath("org.apache.httpcomponents:httpclient:4.5.14")
             classpath("org.bitbucket.b_c:jose4j:0.9.6")
@@ -26,20 +26,20 @@ plugins {
 allprojects {
     configurations.configureEach {
         resolutionStrategy.force(
-            "io.netty:netty-buffer:4.2.17.Final",
-            "io.netty:netty-codec:4.2.17.Final",
-            "io.netty:netty-codec-http:4.2.17.Final",
-            "io.netty:netty-codec-http2:4.2.17.Final",
-            "io.netty:netty-codec-socks:4.2.17.Final",
-            "io.netty:netty-common:4.2.17.Final",
-            "io.netty:netty-handler:4.2.17.Final",
-            "io.netty:netty-handler-proxy:4.2.17.Final",
-            "io.netty:netty-resolver:4.2.17.Final",
-            "io.netty:netty-transport:4.2.17.Final",
-            "io.netty:netty-transport-native-unix-common:4.2.17.Final",
-            "org.bouncycastle:bcpkix-jdk18on:1.84",
-            "org.bouncycastle:bcprov-jdk18on:1.84",
-            "org.bouncycastle:bcutil-jdk18on:1.84",
+            "io.netty:netty-buffer:4.2.18.Final",
+            "io.netty:netty-codec:4.2.18.Final",
+            "io.netty:netty-codec-http:4.2.18.Final",
+            "io.netty:netty-codec-http2:4.2.18.Final",
+            "io.netty:netty-codec-socks:4.2.18.Final",
+            "io.netty:netty-common:4.2.18.Final",
+            "io.netty:netty-handler:4.2.18.Final",
+            "io.netty:netty-handler-proxy:4.2.18.Final",
+            "io.netty:netty-resolver:4.2.18.Final",
+            "io.netty:netty-transport:4.2.18.Final",
+            "io.netty:netty-transport-native-unix-common:4.2.18.Final",
+            "org.bouncycastle:bcpkix-jdk18on:1.85",
+            "org.bouncycastle:bcprov-jdk18on:1.85",
+            "org.bouncycastle:bcutil-jdk18on:1.85",
             "org.apache.commons:commons-lang3:3.20.0",
             "org.apache.httpcomponents:httpclient:4.5.14",
             "org.bitbucket.b_c:jose4j:0.9.6",
