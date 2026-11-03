@@ -104,7 +104,7 @@ jobs:
           sed -Ei 's#id\("org\.jetbrains\.kotlin\.plugin\.compose"\) version "[^"]+"#id("org.jetbrains.kotlin.plugin.compose") version "2.4.10"#' build.gradle.kts
           grep -Fq 'id("org.jetbrains.kotlin.plugin.compose") version "2.4.10"' build.gradle.kts
           ./gradlew compileDebugKotlin --no-daemon --no-build-cache --no-configuration-cache
-      - uses: github/codeql-action/analyze@988661ebb5e81487b3fb31b2185d2856c0a10679 # v4
+      - uses: github/codeql-action/analyze@c5320e3a8ad94d7525239ea44a43aca15468785d # v4
 
   analyze-actions:
     name: Analyze actions
@@ -121,4 +121,4 @@ jobs:
           languages: actions
           build-mode: none
           queries: security-extended
-      - uses: github/codeql-action/analyze@988661ebb5e81487b3fb31b2185d2856c0a10679 # v4
+      - uses: github/codeql-action/analyze@c5320e3a8ad94d7525239ea44a43aca15468785d # v4
